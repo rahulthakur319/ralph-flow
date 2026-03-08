@@ -56,14 +56,16 @@ Story Loop          Tasks Loop              Delivery Loop
 
 ## Commands
 
-### `ralphflow init`
+All commands are run via `npx ralphflow` — no global install needed.
+
+### `npx ralphflow init`
 
 Scaffolds a new flow in `.ralph-flow/<name>/`.
 
 ```bash
-ralphflow init                                          # Interactive — pick template and name
-ralphflow init --template code-implementation --name api # Non-interactive
-ralphflow init --template research --name kashi          # Research pipeline
+npx ralphflow init                                          # Interactive — pick template and name
+npx ralphflow init --template code-implementation --name api # Non-interactive
+npx ralphflow init --template research --name kashi          # Research pipeline
 ```
 
 Requires `CLAUDE.md` to exist in your project root. If it doesn't, you'll be prompted to create one first.
@@ -72,17 +74,17 @@ Requires `CLAUDE.md` to exist in your project root. If it doesn't, you'll be pro
 - `-t, --template <name>` — Template to use (`code-implementation`, `research`)
 - `-n, --name <name>` — Custom name for the flow
 
-### `ralphflow run <loop>`
+### `npx ralphflow run <loop>`
 
 Runs a loop. Handles the iteration cycle — spawning Claude, detecting completion signals, and restarting on `kill -INT $PPID`.
 
 ```bash
-ralphflow run story                    # Run story loop
-ralphflow run tasks                    # Run tasks loop (single agent)
-ralphflow run tasks --agents 3         # Run with 3 parallel agents
-ralphflow run delivery                 # Run delivery loop
-ralphflow run story --flow my-app      # Specify which flow (when multiple exist)
-ralphflow run tasks --max-iterations 5 # Limit iterations
+npx ralphflow run story                    # Run story loop
+npx ralphflow run tasks                    # Run tasks loop (single agent)
+npx ralphflow run tasks --agents 3         # Run with 3 parallel agents
+npx ralphflow run delivery                 # Run delivery loop
+npx ralphflow run story --flow my-app      # Specify which flow (when multiple exist)
+npx ralphflow run tasks --max-iterations 5 # Limit iterations
 ```
 
 **Options:**
@@ -91,13 +93,13 @@ ralphflow run tasks --max-iterations 5 # Limit iterations
 - `-n, --max-iterations <n>` — Maximum iterations (default: 30)
 - `-f, --flow <name>` — Which flow to run (auto-detected if only one exists)
 
-### `ralphflow status`
+### `npx ralphflow status`
 
 Shows the current state of all loops across all flows.
 
 ```bash
-ralphflow status                # All flows
-ralphflow status --flow my-app  # Specific flow
+npx ralphflow status                # All flows
+npx ralphflow status --flow my-app  # Specific flow
 ```
 
 ```
@@ -119,11 +121,11 @@ ralphflow status --flow my-app  # Specific flow
 You can run multiple flows in the same project — useful for separate workstreams:
 
 ```bash
-ralphflow init --template code-implementation --name frontend
-ralphflow init --template code-implementation --name backend
-ralphflow init --template research --name market-research
+npx ralphflow init --template code-implementation --name frontend
+npx ralphflow init --template code-implementation --name backend
+npx ralphflow init --template research --name market-research
 
-ralphflow status  # Shows all three
+npx ralphflow status  # Shows all three
 ```
 
 When multiple flows exist, use `--flow <name>` with `run` and `status`.
@@ -140,7 +142,7 @@ Multi-loop research pipeline with discovery, research, story, evolution, issue, 
 
 ## Project Structure
 
-After `ralphflow init --template code-implementation --name my-app`:
+After `npx ralphflow init --template code-implementation --name my-app`:
 
 ```
 your-project/
@@ -176,6 +178,22 @@ your-project/
 - **Delivery loop** reads it for project context and patterns
 
 RalphFlow requires `CLAUDE.md` to exist before initializing a flow. Create one with your project description, tech stack, dev commands, and conventions — or let Claude generate it for you.
+
+## Install
+
+No install required — use `npx ralphflow` directly. Or install globally:
+
+```bash
+npm install -g ralphflow
+```
+
+Then use without the `npx` prefix:
+
+```bash
+ralphflow init --template code-implementation --name my-app
+ralphflow run story
+ralphflow status
+```
 
 ## Requirements
 
