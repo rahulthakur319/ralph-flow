@@ -40,7 +40,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/user/ralph-flow"
+    "url": "https://github.com/rahulthakur319/ralph-flow"
   },
   "engines": {
     "node": ">=18.0.0"
