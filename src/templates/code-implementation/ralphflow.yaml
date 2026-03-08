@@ -1,0 +1,71 @@
+name: code-implementation
+description: "Story → Task → Delivery pipeline for code projects"
+version: 1
+dir: .ralph-flow
+
+entities:
+  STORY:
+    prefix: STORY
+    data_file: 00-story-loop/stories.md
+  TASK:
+    prefix: TASK
+    data_file: 01-tasks-loop/tasks.md
+  TASK-GROUP:
+    prefix: TASK-GROUP
+    data_file: 01-tasks-loop/tasks.md
+
+loops:
+  story-loop:
+    order: 0
+    name: "Story Loop"
+    prompt: 00-story-loop/prompt.md
+    tracker: 00-story-loop/tracker.md
+    data_files:
+      - 00-story-loop/stories.md
+    entities: [STORY]
+    stages: [analyze, clarify, decompose]
+    completion: "ALL STORIES PROCESSED"
+    feeds: [tasks-loop]
+    multi_agent: false
+    cadence: 0
+
+  tasks-loop:
+    order: 1
+    name: "Tasks Loop"
+    prompt: 01-tasks-loop/prompt.md
+    tracker: 01-tasks-loop/tracker.md
+    data_files:
+      - 01-tasks-loop/tasks.md
+    directories:
+      - 01-tasks-loop/phases/
+      - 01-tasks-loop/testing/
+    entities: [TASK, TASK-GROUP]
+    stages: [understand-execute, verify-document]
+    completion: "ALL TASKS COMPLETE"
+    fed_by: [story-loop]
+    feeds: [delivery-loop]
+    multi_agent:
+      enabled: true
+      max_agents: 4
+      strategy: tracker-lock
+      agent_placeholder: "{{AGENT_NAME}}"
+    lock:
+      file: 01-tasks-loop/.tracker-lock
+      type: echo
+      stale_seconds: 60
+    worktree:
+      strategy: shared
+      auto_merge: true
+    cadence: 0
+
+  delivery-loop:
+    order: 2
+    name: "Delivery Loop"
+    prompt: 02-delivery-loop/prompt.md
+    tracker: 02-delivery-loop/tracker.md
+    entities: [STORY]
+    stages: [review, present-and-feedback, resolution]
+    completion: "ALL DELIVERABLES PRESENTED"
+    fed_by: [tasks-loop]
+    multi_agent: false
+    cadence: 0

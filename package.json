@@ -1,0 +1,68 @@
+{
+  "name": "ralphflow",
+  "version": "0.1.0",
+  "description": "Multi-agent AI workflow orchestration framework for Claude Code. Define pipelines as loops, coordinate parallel agents, and ship structured work.",
+  "type": "module",
+  "bin": {
+    "ralphflow": "./dist/ralphflow.js"
+  },
+  "main": "./dist/core/index.js",
+  "types": "./dist/core/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/core/index.js",
+      "types": "./dist/core/index.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/cli/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai-agents",
+    "multi-agent",
+    "workflow",
+    "orchestration",
+    "pipeline",
+    "state-machine",
+    "automation",
+    "developer-tools"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/ralph-flow"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "src/templates/"
+  ],
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "chokidar": "^4.0.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^12.1.0",
+    "hono": "^4.6.0",
+    "simple-git": "^3.27.0",
+    "ws": "^8.18.0",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  }
+}
