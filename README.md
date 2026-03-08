@@ -1,5 +1,9 @@
 # RalphFlow
 
+<p align="center">
+  <img src="WiggumFlow.png" alt="RalphFlow" width="400" />
+</p>
+
 Multi-agent AI workflow orchestration for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
 Define pipelines as loops, coordinate parallel agents via file-based trackers, and ship structured work — from single-agent interactive sessions to multi-agent autonomous execution.
