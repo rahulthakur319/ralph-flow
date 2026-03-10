@@ -23,8 +23,10 @@ npx ralphflow run story
 # 4. Run the tasks loop — agents implement your stories
 npx ralphflow run tasks
 
-# 5. Run with multiple agents for parallel execution
-npx ralphflow run tasks --agents 3
+# 5. Run with multiple agents — open multiple terminals
+npx ralphflow run tasks --multi-agent   # Terminal 1 → auto-assigns agent-1
+npx ralphflow run tasks --multi-agent   # Terminal 2 → auto-assigns agent-2
+npx ralphflow run tasks --multi-agent   # Terminal 3 → auto-assigns agent-3
 
 # 6. Deliver — review, get feedback, resolve
 npx ralphflow run delivery
@@ -41,9 +43,9 @@ The default `code-implementation` template ships with three loops:
 
 | Loop | Purpose | Mode |
 |------|---------|------|
-| **Story Loop** | Break features into stories and tasks | Interactive — Claude asks you questions |
-| **Tasks Loop** | Implement tasks, commit code, update CLAUDE.md | Single or multi-agent (autonomous) |
-| **Delivery Loop** | Review completed work, gather feedback | Interactive — Claude presents deliverables |
+| **Story Loop** | Break features into stories and tasks | Interactive Claude Code session |
+| **Tasks Loop** | Implement tasks, commit code, update CLAUDE.md | Single or multi-agent (`--multi-agent`) |
+| **Delivery Loop** | Review completed work, gather feedback | Interactive Claude Code session |
 
 ### Pipeline Flow
 
@@ -83,16 +85,20 @@ Requires `CLAUDE.md` to exist in your project root. If it doesn't, you'll be pro
 Runs a loop. Handles the iteration cycle — spawning Claude, detecting completion signals, and restarting on `kill -INT $PPID`.
 
 ```bash
-npx ralphflow run story                    # Run story loop
+npx ralphflow run story                    # Run story loop (interactive Claude session)
 npx ralphflow run tasks                    # Run tasks loop (single agent)
-npx ralphflow run tasks --agents 3         # Run with 3 parallel agents
+npx ralphflow run tasks --multi-agent      # Run as a multi-agent instance (auto-assigns agent ID)
 npx ralphflow run delivery                 # Run delivery loop
 npx ralphflow run story --flow my-app      # Specify which flow (when multiple exist)
 npx ralphflow run tasks --max-iterations 5 # Limit iterations
 ```
 
+Each `run` command opens a full interactive Claude Code session. Claude owns the terminal — you see everything it does in real time.
+
+**Multi-agent mode:** Instead of spawning N agents from one process, each terminal is one agent. Open multiple terminals, run `--multi-agent` in each, and they auto-assign sequential agent IDs (`agent-1`, `agent-2`, ...) via PID-based lock files. Stale agents are automatically cleaned up.
+
 **Options:**
-- `-a, --agents <n>` — Number of parallel agents (default: 1)
+- `--multi-agent` — Run as a multi-agent instance (auto-assigns agent ID)
 - `-m, --model <model>` — Claude model to use
 - `-n, --max-iterations <n>` — Maximum iterations (default: 30)
 - `-f, --flow <name>` — Which flow to run (auto-detected if only one exists)
@@ -109,12 +115,10 @@ npx ralphflow status --flow my-app  # Specific flow
 ```
   RalphFlow — my-app
 
-  Loop           Stage              Active  Progress
-  Story Loop     analyze            none    0/0
-  Tasks Loop     —                  none    3/6
-    agent-1      understand-execute TASK-4  2026-03-08T10:00
-    agent-2      verify-document    TASK-5  2026-03-08T10:01
-  Delivery Loop  idle               none    0/0
+  Loop           Stage    Active  Progress
+  Story Loop     analyze  none    0/0
+  Tasks Loop     —        none    3/6
+  Delivery Loop  idle     none    0/0
 ```
 
 **Options:**
@@ -142,7 +146,7 @@ Story → Tasks → Delivery pipeline for code projects. Battle-tested across 28
 
 ### `research`
 
-Multi-loop research pipeline with discovery, research, story, evolution, issue, datapoints, and merge loops. Tested across 467 places and 94 roads in a Kashi/Varanasi research project.
+Discovery → Research → Story → Document pipeline for research projects. Four loops: discovery (decompose topics), research (investigate with multi-agent), story (synthesize narratives), and document (compile final output).
 
 ## Project Structure
 

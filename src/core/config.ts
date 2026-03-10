@@ -4,12 +4,19 @@ import { parse as parseYaml } from 'yaml';
 import type { RalphFlowConfig, LoopConfig } from './types.js';
 
 const LOOP_ALIASES: Record<string, string> = {
+  // code-implementation aliases
   story: 'story-loop',
   stories: 'story-loop',
   tasks: 'tasks-loop',
   task: 'tasks-loop',
   delivery: 'delivery-loop',
   deliver: 'delivery-loop',
+  // research aliases
+  discovery: 'discovery-loop',
+  discover: 'discovery-loop',
+  research: 'research-loop',
+  document: 'document-loop',
+  doc: 'document-loop',
 };
 
 /**

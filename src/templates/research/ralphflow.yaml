@@ -1,0 +1,80 @@
+name: research
+description: "Discovery → Research → Story → Document pipeline for research projects"
+version: 1
+dir: .ralph-flow
+
+entities:
+  TOPIC:
+    prefix: TOPIC
+    data_file: 00-discovery-loop/topics.md
+  FINDING:
+    prefix: FINDING
+    data_file: 01-research-loop/findings.md
+  STORY:
+    prefix: STORY
+    data_file: 02-story-loop/stories.md
+
+loops:
+  discovery-loop:
+    order: 0
+    name: "Discovery Loop"
+    prompt: 00-discovery-loop/prompt.md
+    tracker: 00-discovery-loop/tracker.md
+    data_files:
+      - 00-discovery-loop/topics.md
+    entities: [TOPIC]
+    stages: [scope, explore, decompose]
+    completion: "ALL TOPICS DISCOVERED"
+    feeds: [research-loop]
+    multi_agent: false
+    cadence: 0
+
+  research-loop:
+    order: 1
+    name: "Research Loop"
+    prompt: 01-research-loop/prompt.md
+    tracker: 01-research-loop/tracker.md
+    data_files:
+      - 01-research-loop/findings.md
+    entities: [TOPIC, FINDING]
+    stages: [investigate, synthesize]
+    completion: "ALL TOPICS RESEARCHED"
+    fed_by: [discovery-loop]
+    feeds: [story-loop]
+    multi_agent:
+      enabled: true
+      max_agents: 4
+      strategy: tracker-lock
+      agent_placeholder: "{{AGENT_NAME}}"
+    lock:
+      file: 01-research-loop/.tracker-lock
+      type: echo
+      stale_seconds: 60
+    cadence: 0
+
+  story-loop:
+    order: 2
+    name: "Story Loop"
+    prompt: 02-story-loop/prompt.md
+    tracker: 02-story-loop/tracker.md
+    data_files:
+      - 02-story-loop/stories.md
+    entities: [STORY]
+    stages: [draft, refine]
+    completion: "ALL STORIES WRITTEN"
+    fed_by: [research-loop]
+    feeds: [document-loop]
+    multi_agent: false
+    cadence: 0
+
+  document-loop:
+    order: 3
+    name: "Document Loop"
+    prompt: 03-document-loop/prompt.md
+    tracker: 03-document-loop/tracker.md
+    entities: [STORY]
+    stages: [compile]
+    completion: "DOCUMENT COMPLETE"
+    fed_by: [story-loop]
+    multi_agent: false
+    cadence: 0

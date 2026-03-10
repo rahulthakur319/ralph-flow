@@ -55,8 +55,7 @@ export interface WorktreeConfig {
 export interface RunOptions {
   model?: string;
   maxIterations: number;
-  agents: number;
-  agentName?: string;
+  multiAgent: boolean;
   flow?: string;
   cwd: string;
 }
