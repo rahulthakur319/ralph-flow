@@ -8,6 +8,7 @@ import { WebSocketServer } from 'ws';
 import chalk from 'chalk';
 import { createApiRoutes } from './api.js';
 import { setupWatcher } from './watcher.js';
+import { installNotificationHook, removeNotificationHook } from './hooks.js';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 
@@ -73,16 +74,51 @@ export async function startDashboard(options: { cwd: string; port?: number }): P
   // Setup file watcher + WS broadcasting
   const watcherHandle = setupWatcher(cwd, wss);
 
+  // Install Claude notification hook
+  try {
+    installNotificationHook(cwd, port);
+    console.log(chalk.dim(`  Configured Claude hook → .claude/settings.local.json`));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(chalk.yellow(`  ⚠ Could not configure Claude hook: ${msg}`));
+  }
+
   console.log();
   console.log(chalk.bold(`  Dashboard ${chalk.dim('→')} http://localhost:${port}`));
   console.log(chalk.dim(`  Watching ${cwd}/.ralph-flow/`));
   console.log();
 
-  return {
-    close() {
-      watcherHandle.close();
-      wss.close();
-      (server as any).close();
-    },
+  let closed = false;
+
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    watcherHandle.close();
+    wss.close();
+    (server as any).close();
+    try {
+      removeNotificationHook(cwd);
+      console.log(chalk.dim('  Removed Claude hook'));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.log(chalk.yellow(`  ⚠ Could not remove Claude hook: ${msg}`));
+    }
   };
+
+  // Signal handlers for graceful shutdown
+  const onSignal = () => {
+    close();
+    process.exit();
+  };
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+
+  // Fallback: ensure hook removal even if another handler calls process.exit() first
+  process.on('exit', () => {
+    if (!closed) {
+      try { removeNotificationHook(cwd); } catch { /* best effort */ }
+    }
+  });
+
+  return { close };
 }
