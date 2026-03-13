@@ -1029,6 +1029,177 @@
     background: var(--bg);
     color: var(--text);
   }
+
+  /* Templates page */
+  .templates-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .templates-header h2 { font-size: 20px; font-weight: 600; }
+  .template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .template-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    transition: border-color 0.15s;
+  }
+  .template-card:hover { border-color: var(--text-dim); }
+  .template-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .template-card-name { font-size: 14px; font-weight: 600; }
+  .template-card-type {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .template-card-type.built-in { background: rgba(88,166,255,0.1); color: var(--blue); }
+  .template-card-type.custom { background: rgba(63,185,80,0.1); color: var(--green); }
+  .template-card-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+  .template-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* Template builder */
+  .template-builder { max-width: 800px; }
+  .builder-section { margin-bottom: 24px; }
+  .builder-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text);
+  }
+  .loop-cards { display: flex; flex-direction: column; gap: 12px; }
+  .loop-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .loop-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .loop-card-title { font-size: 13px; font-weight: 600; }
+  .loop-card-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .loop-card-remove:hover { color: var(--red); }
+  .loop-card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .loop-card-grid .form-group { margin-bottom: 0; }
+  .loop-card-full { grid-column: 1 / -1; }
+  .stage-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    min-height: 36px;
+    align-items: center;
+    cursor: text;
+  }
+  .stage-tags:focus-within { border-color: var(--accent); }
+  .stage-tag {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(88,166,255,0.1);
+    color: var(--accent);
+    border-radius: 4px;
+  }
+  .stage-tag-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .stage-tag-remove:hover { color: var(--red); }
+  .stage-tags input {
+    border: none;
+    background: none;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    outline: none;
+    min-width: 80px;
+    flex: 1;
+  }
+  .multi-agent-fields {
+    margin-top: 8px;
+    padding: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+  .toggle-input { accent-color: var(--accent); }
+  .toggle-label { font-size: 12px; color: var(--text-dim); }
+  .yaml-preview-section { margin-top: 24px; }
+  .yaml-preview {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .builder-actions { display: flex; gap: 8px; margin-top: 20px; }
+  .optional-toggle {
+    font-size: 12px;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-top: 8px;
+  }
+  .optional-toggle:hover { text-decoration: underline; }
+  .optional-fields {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
 </style>
 </head>
 <body>
@@ -1043,6 +1214,10 @@
     <div class="sidebar-section">
       <div class="sidebar-label">Apps</div>
       <div id="sidebarApps"></div>
+    </div>
+    <div class="sidebar-section" style="border-top: 1px solid var(--border)">
+      <div class="sidebar-label">Manage</div>
+      <div class="sidebar-item" id="templatesNav">Templates</div>
     </div>
   </div>
   <div class="content" id="content">
@@ -1079,6 +1254,10 @@
   let expandedArchive = null;
   let archiveFilesCache = {};
   let viewingArchiveFile = null;
+  let currentPage = 'app';
+  let templatesList = [];
+  let showTemplateBuilder = false;
+  let templateBuilderState = null;
 
   // DOM refs
   const $ = (sel) => document.querySelector(sel);
@@ -1245,9 +1424,16 @@
         }
       });
     });
+
+    // Update Templates nav active state
+    const templatesNav = document.getElementById('templatesNav');
+    if (templatesNav) {
+      templatesNav.classList.toggle('active', currentPage === 'templates');
+    }
   }
 
   function selectApp(app) {
+    currentPage = 'app';
     selectedApp = app;
     selectedLoop = app.loops.length > 0 ? app.loops[0].key : null;
     promptDirty = false;
@@ -1275,6 +1461,10 @@
 
   // Main content
   function renderContent() {
+    if (currentPage === 'templates') {
+      renderTemplatesPage();
+      return;
+    }
     if (!selectedApp) {
       content.innerHTML = '<div class="content-empty">Select an app to view details</div>';
       return;
@@ -2293,10 +2483,26 @@
   }
 
   // Create App Modal
-  function openCreateAppModal() {
+  async function openCreateAppModal() {
     // Remove any existing modal
     const existing = document.querySelector('.modal-overlay');
     if (existing) existing.remove();
+
+    // Fetch available templates (built-in + custom)
+    let templates = [];
+    try {
+      templates = await fetchJson('/api/templates');
+    } catch {
+      templates = [
+        { name: 'code-implementation', type: 'built-in' },
+        { name: 'research', type: 'built-in' }
+      ];
+    }
+
+    let optionsHtml = '';
+    for (const tpl of templates) {
+      optionsHtml += `<option value="${esc(tpl.name)}">${esc(tpl.name)}${tpl.type === 'custom' ? ' (custom)' : ''}</option>`;
+    }
 
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -2310,8 +2516,7 @@
           <div class="form-group">
             <label class="form-label">Template</label>
             <select class="form-select" id="modalTemplate">
-              <option value="code-implementation">code-implementation</option>
-              <option value="research">research</option>
+              ${optionsHtml}
             </select>
           </div>
           <div class="form-group">
@@ -2448,7 +2653,592 @@
     });
   }
 
+  // -----------------------------------------------------------------------
+  // Templates page
+  // -----------------------------------------------------------------------
+
+  async function fetchTemplates() {
+    try {
+      templatesList = await fetchJson('/api/templates');
+    } catch {
+      templatesList = [];
+    }
+  }
+
+  function createEmptyLoop() {
+    return {
+      name: '',
+      stages: ['init'],
+      completion: 'LOOP COMPLETE',
+      model: 'claude-sonnet-4-6',
+      multi_agent: false,
+      max_agents: 3,
+      strategy: 'parallel',
+      agent_placeholder: '{{AGENT_NAME}}',
+      data_files: [],
+      entities: [],
+      showOptional: false
+    };
+  }
+
+  function initTemplateBuilderState() {
+    return { name: '', description: '', loops: [createEmptyLoop()] };
+  }
+
+  async function renderTemplatesPage() {
+    if (showTemplateBuilder) {
+      renderTemplateBuilder();
+      return;
+    }
+
+    await fetchTemplates();
+
+    let html = '<div class="templates-header">';
+    html += '<h2>Templates</h2>';
+    html += '<button class="btn btn-primary" id="createTemplateBtn">Create Template</button>';
+    html += '</div>';
+
+    if (templatesList.length === 0) {
+      html += '<div class="content-empty">No templates found</div>';
+    } else {
+      html += '<div class="template-grid">';
+      for (const tpl of templatesList) {
+        html += `<div class="template-card">
+          <div class="template-card-header">
+            <span class="template-card-name">${esc(tpl.name)}</span>
+            <span class="template-card-type ${tpl.type}">${esc(tpl.type)}</span>
+          </div>
+          ${tpl.description ? `<div class="template-card-desc">${esc(tpl.description)}</div>` : ''}
+          <div class="template-card-meta">
+            <span>${tpl.loopCount} loop${tpl.loopCount !== 1 ? 's' : ''}</span>
+            ${tpl.type === 'custom' ? `<button class="btn btn-danger" style="font-size:11px;padding:2px 8px" data-delete-template="${esc(tpl.name)}">Delete</button>` : ''}
+          </div>
+        </div>`;
+      }
+      html += '</div>';
+    }
+
+    content.innerHTML = html;
+
+    const createBtn = document.getElementById('createTemplateBtn');
+    if (createBtn) {
+      createBtn.addEventListener('click', () => {
+        showTemplateBuilder = true;
+        templateBuilderState = initTemplateBuilderState();
+        renderTemplatesPage();
+      });
+    }
+
+    content.querySelectorAll('[data-delete-template]').forEach(btn => {
+      btn.addEventListener('click', () => openDeleteTemplateModal(btn.dataset.deleteTemplate));
+    });
+  }
+
+  function renderTemplateBuilder() {
+    const state = templateBuilderState;
+    let html = '';
+
+    html += '<div class="templates-header">';
+    html += '<div style="display:flex;align-items:center;gap:12px"><button class="btn btn-muted" id="builderBackBtn" style="padding:4px 10px">&larr; Back</button><h2>Create Template</h2></div>';
+    html += '</div>';
+
+    html += '<div class="template-builder">';
+
+    // Basic info
+    html += '<div class="builder-section">';
+    html += '<div class="builder-section-title">Basic Info</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    html += `<div class="form-group"><label class="form-label">Template Name</label>
+      <input class="form-input" id="tplName" type="text" value="${esc(state.name)}" placeholder="my-pipeline" autocomplete="off"></div>`;
+    html += `<div class="form-group"><label class="form-label">Description</label>
+      <input class="form-input" id="tplDesc" type="text" value="${esc(state.description)}" placeholder="Pipeline description" autocomplete="off"></div>`;
+    html += '</div></div>';
+
+    // Loops
+    html += '<div class="builder-section">';
+    html += '<div class="builder-section-title">Loops</div>';
+    html += '<div class="loop-cards">';
+
+    state.loops.forEach((loop, i) => {
+      html += `<div class="loop-card" data-loop-index="${i}">`;
+      html += `<div class="loop-card-header">
+        <span class="loop-card-title">Loop ${i + 1}</span>
+        ${state.loops.length > 1 ? `<button class="loop-card-remove" data-remove-loop="${i}">&times;</button>` : ''}
+      </div>`;
+
+      html += '<div class="loop-card-grid">';
+
+      // Name
+      html += `<div class="form-group"><label class="form-label">Name</label>
+        <input class="form-input loop-input" data-loop-idx="${i}" data-field="name" type="text" value="${esc(loop.name)}" placeholder="Story" autocomplete="off"></div>`;
+
+      // Model
+      html += `<div class="form-group"><label class="form-label">Model</label>
+        <select class="form-select loop-input" data-loop-idx="${i}" data-field="model">
+          <option value="claude-sonnet-4-6"${loop.model === 'claude-sonnet-4-6' ? ' selected' : ''}>claude-sonnet-4-6</option>
+          <option value="claude-opus-4-6"${loop.model === 'claude-opus-4-6' ? ' selected' : ''}>claude-opus-4-6</option>
+          <option value="claude-haiku-4-5-20251001"${loop.model === 'claude-haiku-4-5-20251001' ? ' selected' : ''}>claude-haiku-4-5-20251001</option>
+        </select></div>`;
+
+      // Stages (tag input)
+      html += `<div class="form-group loop-card-full"><label class="form-label">Stages</label>
+        <div class="stage-tags" data-loop-idx="${i}">`;
+      loop.stages.forEach((stage, si) => {
+        html += `<span class="stage-tag">${esc(stage)}<button class="stage-tag-remove" data-loop-idx="${i}" data-stage-idx="${si}">&times;</button></span>`;
+      });
+      html += `<input type="text" placeholder="Type stage, press Enter" data-stage-input="${i}" autocomplete="off">`;
+      html += '</div></div>';
+
+      // Completion
+      html += `<div class="form-group loop-card-full"><label class="form-label">Completion String</label>
+        <input class="form-input loop-input" data-loop-idx="${i}" data-field="completion" type="text" value="${esc(loop.completion)}" placeholder="LOOP COMPLETE" autocomplete="off"></div>`;
+
+      html += '</div>'; // close loop-card-grid
+
+      // Multi-agent toggle
+      html += `<div style="margin-top:12px">
+        <label class="toggle-wrap">
+          <input type="checkbox" class="toggle-input" data-loop-idx="${i}" data-field="multi_agent" ${loop.multi_agent ? 'checked' : ''}>
+          <span class="toggle-label">Multi-agent</span>
+        </label>`;
+
+      if (loop.multi_agent) {
+        html += `<div class="multi-agent-fields">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div class="form-group" style="margin-bottom:0"><label class="form-label">Max Agents</label>
+              <input class="form-input loop-input" data-loop-idx="${i}" data-field="max_agents" type="number" value="${loop.max_agents}" min="2" max="10"></div>
+            <div class="form-group" style="margin-bottom:0"><label class="form-label">Strategy</label>
+              <select class="form-select loop-input" data-loop-idx="${i}" data-field="strategy">
+                <option value="parallel"${loop.strategy === 'parallel' ? ' selected' : ''}>parallel</option>
+                <option value="sequential"${loop.strategy === 'sequential' ? ' selected' : ''}>sequential</option>
+              </select></div>
+            <div class="form-group" style="margin-bottom:0"><label class="form-label">Agent Placeholder</label>
+              <input class="form-input loop-input" data-loop-idx="${i}" data-field="agent_placeholder" type="text" value="${esc(loop.agent_placeholder)}"></div>
+          </div>
+        </div>`;
+      }
+      html += '</div>';
+
+      // Optional fields toggle
+      html += `<button class="optional-toggle" data-toggle-optional="${i}">${loop.showOptional ? 'Hide optional fields' : 'Show optional fields'}</button>`;
+
+      if (loop.showOptional) {
+        html += '<div class="optional-fields">';
+        html += '<div class="loop-card-grid">';
+        html += `<div class="form-group"><label class="form-label">Data Files <span style="color:var(--text-muted)">(comma-separated)</span></label>
+          <input class="form-input loop-input" data-loop-idx="${i}" data-field="data_files" type="text" value="${esc((loop.data_files || []).join(', '))}" placeholder="stories.md, tasks.md" autocomplete="off"></div>`;
+        html += `<div class="form-group"><label class="form-label">Entities <span style="color:var(--text-muted)">(comma-separated)</span></label>
+          <input class="form-input loop-input" data-loop-idx="${i}" data-field="entities" type="text" value="${esc((loop.entities || []).join(', '))}" placeholder="STORY, TASK" autocomplete="off"></div>`;
+        html += '</div></div>';
+      }
+
+      html += '</div>'; // close loop-card
+    });
+
+    html += '</div>'; // close loop-cards
+    html += `<button class="btn btn-muted" id="addLoopBtn" style="margin-top:12px;width:100%">+ Add Loop</button>`;
+    html += '</div>'; // close builder-section
+
+    // YAML Preview
+    html += '<div class="builder-section yaml-preview-section">';
+    html += '<div class="builder-section-title">YAML Preview</div>';
+    html += `<pre class="yaml-preview" id="yamlPreview">${esc(generateYamlPreview(state))}</pre>`;
+    html += '</div>';
+
+    // Actions
+    html += '<div class="builder-actions">';
+    html += '<button class="btn" id="builderCancelBtn">Cancel</button>';
+    html += '<button class="btn btn-primary" id="builderSaveBtn">Save Template</button>';
+    html += '</div>';
+
+    html += '</div>'; // close template-builder
+
+    content.innerHTML = html;
+    bindTemplateBuilderEvents();
+  }
+
+  function bindTemplateBuilderEvents() {
+    const backBtn = document.getElementById('builderBackBtn');
+    if (backBtn) backBtn.addEventListener('click', () => {
+      showTemplateBuilder = false;
+      templateBuilderState = null;
+      renderTemplatesPage();
+    });
+
+    const cancelBtn = document.getElementById('builderCancelBtn');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => {
+      showTemplateBuilder = false;
+      templateBuilderState = null;
+      renderTemplatesPage();
+    });
+
+    const saveBtn = document.getElementById('builderSaveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', saveTemplate);
+
+    const addLoopBtn = document.getElementById('addLoopBtn');
+    if (addLoopBtn) addLoopBtn.addEventListener('click', () => {
+      captureBuilderInputs();
+      templateBuilderState.loops.push(createEmptyLoop());
+      renderTemplateBuilder();
+    });
+
+    // Template name/desc inputs
+    const tplName = document.getElementById('tplName');
+    const tplDesc = document.getElementById('tplDesc');
+    if (tplName) tplName.addEventListener('input', () => {
+      templateBuilderState.name = tplName.value;
+      updateYamlPreview();
+    });
+    if (tplDesc) tplDesc.addEventListener('input', () => {
+      templateBuilderState.description = tplDesc.value;
+      updateYamlPreview();
+    });
+
+    // Loop text inputs
+    content.querySelectorAll('.loop-input').forEach(input => {
+      const idx = parseInt(input.dataset.loopIdx);
+      const field = input.dataset.field;
+      const evtType = input.tagName === 'SELECT' ? 'change' : 'input';
+
+      if (field === 'multi_agent') {
+        input.addEventListener('change', () => {
+          captureBuilderInputs();
+          templateBuilderState.loops[idx].multi_agent = input.checked;
+          renderTemplateBuilder();
+        });
+        return;
+      }
+
+      input.addEventListener(evtType, () => {
+        const loop = templateBuilderState.loops[idx];
+        if (!loop) return;
+        if (field === 'max_agents') {
+          loop.max_agents = parseInt(input.value) || 3;
+        } else if (field === 'data_files') {
+          loop.data_files = input.value.split(',').map(s => s.trim()).filter(Boolean);
+        } else if (field === 'entities') {
+          loop.entities = input.value.split(',').map(s => s.trim()).filter(Boolean);
+        } else {
+          loop[field] = input.value;
+        }
+        updateYamlPreview();
+      });
+    });
+
+    // Stage tag inputs
+    content.querySelectorAll('[data-stage-input]').forEach(input => {
+      const idx = parseInt(input.dataset.stageInput);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          const value = input.value.trim().replace(/,/g, '');
+          if (value && !templateBuilderState.loops[idx].stages.includes(value)) {
+            captureBuilderInputs();
+            templateBuilderState.loops[idx].stages.push(value);
+            renderTemplateBuilder();
+            setTimeout(() => {
+              const newInput = content.querySelector(`[data-stage-input="${idx}"]`);
+              if (newInput) newInput.focus();
+            }, 0);
+          }
+        }
+      });
+    });
+
+    // Stage tag remove buttons
+    content.querySelectorAll('.stage-tag-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        captureBuilderInputs();
+        const loopIdx = parseInt(btn.dataset.loopIdx);
+        const stageIdx = parseInt(btn.dataset.stageIdx);
+        templateBuilderState.loops[loopIdx].stages.splice(stageIdx, 1);
+        renderTemplateBuilder();
+      });
+    });
+
+    // Remove loop buttons
+    content.querySelectorAll('[data-remove-loop]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        captureBuilderInputs();
+        const idx = parseInt(btn.dataset.removeLoop);
+        templateBuilderState.loops.splice(idx, 1);
+        renderTemplateBuilder();
+      });
+    });
+
+    // Optional fields toggle
+    content.querySelectorAll('[data-toggle-optional]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        captureBuilderInputs();
+        const idx = parseInt(btn.dataset.toggleOptional);
+        templateBuilderState.loops[idx].showOptional = !templateBuilderState.loops[idx].showOptional;
+        renderTemplateBuilder();
+      });
+    });
+  }
+
+  // Capture current input values into state before re-render
+  function captureBuilderInputs() {
+    const state = templateBuilderState;
+    if (!state) return;
+    const tplName = document.getElementById('tplName');
+    const tplDesc = document.getElementById('tplDesc');
+    if (tplName) state.name = tplName.value;
+    if (tplDesc) state.description = tplDesc.value;
+
+    content.querySelectorAll('.loop-input').forEach(input => {
+      const idx = parseInt(input.dataset.loopIdx);
+      const field = input.dataset.field;
+      const loop = state.loops[idx];
+      if (!loop || field === 'multi_agent') return;
+      if (field === 'max_agents') {
+        loop.max_agents = parseInt(input.value) || 3;
+      } else if (field === 'data_files') {
+        loop.data_files = input.value.split(',').map(s => s.trim()).filter(Boolean);
+      } else if (field === 'entities') {
+        loop.entities = input.value.split(',').map(s => s.trim()).filter(Boolean);
+      } else {
+        loop[field] = input.value;
+      }
+    });
+  }
+
+  function updateYamlPreview() {
+    const preview = document.getElementById('yamlPreview');
+    if (preview && templateBuilderState) {
+      preview.textContent = generateYamlPreview(templateBuilderState);
+    }
+  }
+
+  function generateYamlPreview(state) {
+    let yaml = '';
+    yaml += `name: ${state.name || 'my-template'}\n`;
+    yaml += `description: "${state.description || ''}"\n`;
+    yaml += `version: 1\n`;
+    yaml += `dir: .ralph-flow\n`;
+    yaml += `entities: {}\n`;
+    yaml += `loops:\n`;
+
+    state.loops.forEach((loop, index) => {
+      const baseName = (loop.name || `loop-${index + 1}`).toLowerCase().replace(/\s+/g, '-');
+      const loopKey = baseName.endsWith('-loop') ? baseName : `${baseName}-loop`;
+      const dirPrefix = String(index).padStart(2, '0');
+      const loopDirName = `${dirPrefix}-${loopKey}`;
+
+      yaml += `  ${loopKey}:\n`;
+      yaml += `    order: ${index}\n`;
+      yaml += `    name: "${loop.name || `Loop ${index + 1}`}"\n`;
+      yaml += `    prompt: ${loopDirName}/prompt.md\n`;
+      yaml += `    tracker: ${loopDirName}/tracker.md\n`;
+      yaml += `    stages: [${loop.stages.join(', ')}]\n`;
+      yaml += `    completion: "${loop.completion || 'LOOP COMPLETE'}"\n`;
+
+      if (loop.multi_agent) {
+        yaml += `    multi_agent:\n`;
+        yaml += `      enabled: true\n`;
+        yaml += `      max_agents: ${loop.max_agents || 3}\n`;
+        yaml += `      strategy: ${loop.strategy || 'parallel'}\n`;
+        yaml += `      agent_placeholder: "${loop.agent_placeholder || '{{AGENT_NAME}}'}"\n`;
+        yaml += `    lock:\n`;
+        yaml += `      file: ${loopDirName}/.tracker-lock\n`;
+        yaml += `      type: echo\n`;
+        yaml += `      stale_seconds: 60\n`;
+        yaml += `    worktree:\n`;
+        yaml += `      strategy: shared\n`;
+        yaml += `      auto_merge: true\n`;
+      } else {
+        yaml += `    multi_agent: false\n`;
+      }
+
+      yaml += `    model: ${loop.model || 'claude-sonnet-4-6'}\n`;
+      yaml += `    cadence: 0\n`;
+
+      if (loop.data_files && loop.data_files.length > 0) {
+        yaml += `    data_files:\n`;
+        loop.data_files.forEach(f => { yaml += `      - ${loopDirName}/${f}\n`; });
+      }
+      if (loop.entities && loop.entities.length > 0) {
+        yaml += `    entities: [${loop.entities.join(', ')}]\n`;
+      }
+    });
+
+    return yaml;
+  }
+
+  async function saveTemplate() {
+    captureBuilderInputs();
+    const state = templateBuilderState;
+
+    if (!state.name || !state.name.trim()) {
+      alert('Template name is required');
+      return;
+    }
+
+    for (let i = 0; i < state.loops.length; i++) {
+      const loop = state.loops[i];
+      if (!loop.name || !loop.name.trim()) {
+        alert(`Loop ${i + 1}: name is required`);
+        return;
+      }
+      if (loop.stages.length === 0) {
+        alert(`Loop "${loop.name}": at least one stage is required`);
+        return;
+      }
+      if (!loop.completion || !loop.completion.trim()) {
+        alert(`Loop "${loop.name}": completion string is required`);
+        return;
+      }
+    }
+
+    const definition = {
+      name: state.name.trim(),
+      description: state.description.trim(),
+      loops: state.loops.map(loop => {
+        const loopDef = {
+          name: loop.name.trim(),
+          stages: loop.stages,
+          completion: loop.completion.trim(),
+          model: loop.model || undefined,
+        };
+        if (loop.multi_agent) {
+          loopDef.multi_agent = {
+            enabled: true,
+            max_agents: loop.max_agents || 3,
+            strategy: loop.strategy || 'parallel',
+            agent_placeholder: loop.agent_placeholder || '{{AGENT_NAME}}'
+          };
+        }
+        if (loop.data_files && loop.data_files.length > 0) {
+          loopDef.data_files = loop.data_files;
+        }
+        if (loop.entities && loop.entities.length > 0) {
+          loopDef.entities = loop.entities;
+        }
+        return loopDef;
+      })
+    };
+
+    const saveBtn = document.getElementById('builderSaveBtn');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+    }
+
+    try {
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(definition)
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || 'Failed to save template');
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Template';
+        }
+        return;
+      }
+
+      showTemplateBuilder = false;
+      templateBuilderState = null;
+      templatesList = [];
+      renderTemplatesPage();
+    } catch {
+      alert('Network error — could not reach server');
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Template';
+      }
+    }
+  }
+
+  function openDeleteTemplateModal(templateName) {
+    const existing = document.querySelector('.modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Delete Template</h3>
+          <button class="modal-close" data-action="close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin-bottom:12px">Delete template <strong>${esc(templateName)}</strong>?</p>
+          <p style="color:var(--red);font-size:13px">This will permanently remove the template. Apps already created from it are not affected.</p>
+          <div id="deleteTemplateMessage"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-action="close">Cancel</button>
+          <button class="btn btn-danger" id="deleteTemplateBtn">Delete</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.dataset.action === 'close') {
+        overlay.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    });
+
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        overlay.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.querySelector('#deleteTemplateBtn').addEventListener('click', async () => {
+      const btn = overlay.querySelector('#deleteTemplateBtn');
+      const msgEl = overlay.querySelector('#deleteTemplateMessage');
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+
+      try {
+        const res = await fetch('/api/templates/' + encodeURIComponent(templateName), { method: 'DELETE' });
+        const data = await res.json();
+
+        if (!res.ok) {
+          msgEl.innerHTML = `<div class="form-error">${esc(data.error || 'Failed to delete')}</div>`;
+          btn.disabled = false;
+          btn.textContent = 'Delete';
+          return;
+        }
+
+        overlay.remove();
+        templatesList = [];
+        renderTemplatesPage();
+      } catch {
+        msgEl.innerHTML = '<div class="form-error">Network error</div>';
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+      }
+    });
+  }
+
+  // -----------------------------------------------------------------------
   // Init
+  // -----------------------------------------------------------------------
+
+  // Templates nav click handler
+  document.getElementById('templatesNav').addEventListener('click', () => {
+    currentPage = 'templates';
+    selectedApp = null;
+    selectedLoop = null;
+    showTemplateBuilder = false;
+    templateBuilderState = null;
+    document.title = 'Templates - RalphFlow Dashboard';
+    renderSidebar();
+    renderContent();
+  });
+
   fetchApps();
   fetchNotifications();
   connectWs();
