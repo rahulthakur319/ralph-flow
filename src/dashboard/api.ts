@@ -7,10 +7,19 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { listFlows, resolveFlowDir, loadConfig } from '../core/config.js';
 import { parseTracker } from '../core/status.js';
 import { getDb, getAllLoopStates, deleteFlowState } from '../core/db.js';
-import { copyTemplate, resolveTemplatePath } from '../core/template.js';
+import {
+  copyTemplate,
+  resolveTemplatePath,
+  resolveTemplatePathWithCustom,
+  BUILT_IN_TEMPLATES,
+  getAvailableTemplates,
+  listCustomTemplates,
+  createCustomTemplate,
+  deleteCustomTemplate,
+  validateTemplateName,
+} from '../core/template.js';
+import type { TemplateDefinition } from '../core/template.js';
 import type { RalphFlowConfig } from '../core/types.js';
-
-const TEMPLATES = ['code-implementation', 'research'] as const;
 
 // ---------------------------------------------------------------------------
 // In-memory notification store
@@ -79,9 +88,13 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
     const body = await c.req.json<{ template?: string; name?: string }>();
     const { template, name } = body;
 
-    // Validate template
-    if (!template || !TEMPLATES.includes(template as typeof TEMPLATES[number])) {
-      return c.json({ error: `Invalid template. Available: ${TEMPLATES.join(', ')}` }, 400);
+    // Validate template — check built-in and custom templates
+    const allTemplateNames = [
+      ...BUILT_IN_TEMPLATES,
+      ...listCustomTemplates(cwd),
+    ];
+    if (!template || !allTemplateNames.includes(template)) {
+      return c.json({ error: `Invalid template. Available: ${allTemplateNames.join(', ')}` }, 400);
     }
 
     // Validate name
@@ -108,9 +121,9 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
       ? null
       : 'No CLAUDE.md found in project root. Consider creating one for better Claude context.';
 
-    // Scaffold the app
+    // Scaffold the app (pass cwd for custom template resolution)
     try {
-      copyTemplate(template, flowDir);
+      copyTemplate(template, flowDir, cwd);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return c.json({ error: `Failed to create app: ${msg}` }, 500);
@@ -208,7 +221,7 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
       // Step 2: Reset tracker and data files using template originals
       let templateDir: string | undefined;
       try {
-        templateDir = resolveTemplatePath(config.name);
+        templateDir = resolveTemplatePathWithCustom(config.name, cwd);
       } catch {
         // Template not found — skip template-based reset
       }
@@ -502,6 +515,98 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
       isDirectory: d.isDirectory(),
     }));
     return c.json({ files });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Template CRUD endpoints
+  // ---------------------------------------------------------------------------
+
+  // GET /api/templates — list all templates (built-in + custom)
+  api.get('/api/templates', (c) => {
+    return c.json(getAvailableTemplates(cwd));
+  });
+
+  // POST /api/templates — create a custom template from a definition
+  api.post('/api/templates', async (c) => {
+    let definition: TemplateDefinition;
+    try {
+      definition = await c.req.json<TemplateDefinition>();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    if (!definition.name) {
+      return c.json({ error: 'Template name is required' }, 400);
+    }
+
+    const validation = validateTemplateName(definition.name);
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    if (!definition.loops || !Array.isArray(definition.loops) || definition.loops.length === 0) {
+      return c.json({ error: 'At least one loop is required' }, 400);
+    }
+
+    // Validate each loop has required fields
+    for (let i = 0; i < definition.loops.length; i++) {
+      const loop = definition.loops[i];
+      if (!loop.name) {
+        return c.json({ error: `Loop ${i + 1}: name is required` }, 400);
+      }
+      if (!loop.stages || !Array.isArray(loop.stages) || loop.stages.length === 0) {
+        return c.json({ error: `Loop "${loop.name}": at least one stage is required` }, 400);
+      }
+      if (!loop.completion) {
+        return c.json({ error: `Loop "${loop.name}": completion string is required` }, 400);
+      }
+    }
+
+    // Check for duplicate
+    const customDir = join(cwd, '.ralph-flow', '.templates', definition.name);
+    if (existsSync(customDir)) {
+      return c.json({ error: `Template "${definition.name}" already exists` }, 409);
+    }
+
+    try {
+      createCustomTemplate(cwd, definition);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Failed to create template: ${msg}` }, 500);
+    }
+
+    return c.json({
+      ok: true,
+      templateName: definition.name,
+      message: `Template "${definition.name}" created successfully`,
+    }, 201);
+  });
+
+  // DELETE /api/templates/:name — delete a custom template
+  api.delete('/api/templates/:name', (c) => {
+    const name = c.req.param('name');
+
+    // Path safety
+    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+      return c.json({ error: 'Invalid name: must not contain "..", "/", or "\\"' }, 400);
+    }
+
+    // Block deletion of built-in templates
+    if ((BUILT_IN_TEMPLATES as readonly string[]).includes(name)) {
+      return c.json({ error: 'Cannot delete built-in templates' }, 403);
+    }
+
+    try {
+      deleteCustomTemplate(cwd, name);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('not found')) {
+        return c.json({ error: msg }, 404);
+      }
+      return c.json({ error: msg }, 500);
+    }
+
+    return c.json({ ok: true, templateName: name });
   });
 
   // POST /api/notification — receive a notification from a Claude hook
