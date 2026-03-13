@@ -130,6 +130,9 @@ The runner sets `RALPHFLOW_APP` (flow directory basename, e.g. `code-implementat
 - `notification:attention` — broadcast when POST /api/notification receives a hook payload
 - `notification:dismissed` — broadcast when DELETE /api/notification/:id removes one
 
+### App Archiving (dashboard/api.ts)
+`POST /api/apps/:app/archive` snapshots the full app directory to `.ralph-flow/.archives/<appName>/<YYYY-MM-DD_HH-mm>/`, then resets the app in place: tracker files revert to template state, data files (stories.md, tasks.md) reset to headers only, `.agents/` dirs and lock files are cleaned up, and SQLite `loop_state` rows are deleted. Prompt files and `ralphflow.yaml` are preserved. Uses `resolveTemplatePath(config.name)` to find template originals for reset. Same-minute collisions append a sequence suffix (e.g., `2026-03-14_15-30-2`). The `.archives/` directory is dotfile-prefixed so `listFlows()` ignores it.
+
 ### Dashboard Notification UI (ui/index.html)
 The Interactive panel (left column, top) renders per-loop attention notifications. Notifications are stored in `notificationsList` (client-side array hydrated from `GET /api/notifications` on load). Each card shows timestamp, message, and dismiss (X) button. Sidebar loop items display a `.notif-badge` count for undismissed notifications. Browser `Notification` API permission is requested on first notification; desktop toasts fire when the tab is in the background. An audible two-note chime (Web Audio API, ~250ms) plays on each notification — AudioContext is lazily initialized on first user interaction to satisfy browser autoplay policies.
 
