@@ -27,6 +27,7 @@ export interface LoopConfig {
   feeds?: string[];
   fed_by?: string[];
   multi_agent: MultiAgentConfig | false;
+  model?: string;
   lock?: LockConfig;
   worktree?: WorktreeConfig;
   cadence: number;

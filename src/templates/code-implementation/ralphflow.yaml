@@ -27,6 +27,7 @@ loops:
     completion: "ALL STORIES PROCESSED"
     feeds: [tasks-loop]
     multi_agent: false
+    model: claude-sonnet-4-6
     cadence: 0
 
   tasks-loop:
@@ -44,6 +45,7 @@ loops:
     completion: "ALL TASKS COMPLETE"
     fed_by: [story-loop]
     feeds: [delivery-loop]
+    model: claude-sonnet-4-6
     multi_agent:
       enabled: true
       max_agents: 4
@@ -68,4 +70,5 @@ loops:
     completion: "ALL DELIVERABLES PRESENTED"
     fed_by: [tasks-loop]
     multi_agent: false
+    model: claude-sonnet-4-6
     cadence: 0

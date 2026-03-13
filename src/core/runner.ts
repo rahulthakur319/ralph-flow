@@ -1,11 +1,11 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import chalk from 'chalk';
-import type { LoopConfig, RunOptions, MultiAgentConfig } from './types.js';
+import type { LoopConfig, RunOptions, MultiAgentConfig, RalphFlowConfig } from './types.js';
 import { loadConfig, resolveLoop, resolveFlowDir } from './config.js';
 import { spawnClaude } from './claude.js';
 import type Database from 'better-sqlite3';
-import { getDb, isLoopComplete, markLoopRunning, incrementIteration, markLoopComplete } from './db.js';
+import { getDb, isLoopComplete, markLoopRunning, incrementIteration, markLoopComplete, resetLoopState } from './db.js';
 
 // ---------------------------------------------------------------------------
 // Agent registry — PID-based lock files in .agents/ directory
@@ -66,6 +66,8 @@ function isMultiAgentLoop(loop: LoopConfig): boolean {
 
 // ---------------------------------------------------------------------------
 // Completion detection — check tracker file for <promise>...</promise>
+// Level 1-2: literal completion string; Level 3: all checkboxes checked;
+// Level 4: metadata fields
 // ---------------------------------------------------------------------------
 
 function checkTrackerForCompletion(flowDir: string, loop: LoopConfig): boolean {
@@ -111,7 +113,11 @@ function checkTrackerMetadataCompletion(flowDir: string, loop: LoopConfig): bool
   return true;
 }
 
-function checkTrackerCheckboxes(flowDir: string, loop: LoopConfig): boolean {
+/**
+ * Level 3: All checkboxes checked — if every checkbox is [x] and none are [ ],
+ * the loop is complete regardless of metadata or completion strings.
+ */
+function checkTrackerAllChecked(flowDir: string, loop: LoopConfig): boolean {
   const trackerPath = join(flowDir, loop.tracker);
   if (!existsSync(trackerPath)) return false;
   const content = readFileSync(trackerPath, 'utf-8');
@@ -180,20 +186,24 @@ async function iterationLoop(
   agentName?: string,
   db?: Database.Database,
   flowName?: string,
+  forceFirstIteration?: boolean,
 ): Promise<void> {
   const loopKey = loop.name;
   const appName = basename(flowDir);
 
   for (let i = 1; i <= options.maxIterations; i++) {
     // Pre-flight: check DB first, then tracker
-    if (db && flowName && isLoopComplete(db, flowName, loopKey)) {
-      console.log(chalk.green(`  \u2713 ${loop.name} \u2014 already complete`));
-      return;
-    }
-    if (checkTrackerForCompletion(flowDir, loop) || checkTrackerCheckboxes(flowDir, loop) || checkTrackerMetadataCompletion(flowDir, loop)) {
-      if (db && flowName) markLoopComplete(db, flowName, loopKey);
-      console.log(chalk.green(`  \u2713 ${loop.name} \u2014 complete`));
-      return;
+    // Skip pre-flight on iteration 1 when forced (e2e story loop re-scan)
+    if (!(forceFirstIteration && i === 1)) {
+      if (db && flowName && isLoopComplete(db, flowName, loopKey)) {
+        console.log(chalk.green(`  \u2713 ${loop.name} \u2014 already complete`));
+        return;
+      }
+      if (checkTrackerForCompletion(flowDir, loop) || checkTrackerMetadataCompletion(flowDir, loop) || checkTrackerAllChecked(flowDir, loop)) {
+        if (db && flowName) markLoopComplete(db, flowName, loopKey);
+        console.log(chalk.green(`  \u2713 ${loop.name} \u2014 complete`));
+        return;
+      }
     }
 
     const label = agentName
@@ -202,9 +212,11 @@ async function iterationLoop(
     console.log(label);
 
     const prompt = readPrompt(loop, flowDir, agentName);
+    // CLI --model overrides per-loop config model; if neither set, Claude uses its default
+    const effectiveModel = options.model || loop.model;
     const result = await spawnClaude({
       prompt,
-      model: options.model,
+      model: effectiveModel,
       cwd: options.cwd,
       env: {
         RALPHFLOW_APP: appName,
@@ -216,7 +228,7 @@ async function iterationLoop(
     if (db && flowName) incrementIteration(db, flowName, loopKey);
 
     // After each iteration, check tracker for completion
-    if (checkTrackerForCompletion(flowDir, loop) || checkTrackerCheckboxes(flowDir, loop) || checkTrackerMetadataCompletion(flowDir, loop)) {
+    if (checkTrackerForCompletion(flowDir, loop) || checkTrackerMetadataCompletion(flowDir, loop) || checkTrackerAllChecked(flowDir, loop)) {
       if (db && flowName) markLoopComplete(db, flowName, loopKey);
       console.log();
       console.log(chalk.green(`  Loop complete: ${loop.completion}`));
@@ -281,62 +293,211 @@ export async function runAllLoops(options: RunOptions): Promise<void> {
 
 /**
  * Run all loops end-to-end with SQLite orchestration.
- * Skips loops already marked complete in DB or detected complete via tracker.
+ * Always re-enters the first loop (story discovery) to scan for new work.
+ * Cycles back when undelivered stories remain after all loops complete.
  */
 export async function runE2E(options: RunOptions): Promise<void> {
   const flowDir = resolveFlowDir(options.cwd, options.flow);
   const config = loadConfig(flowDir);
   const flowName = options.flow || basename(flowDir);
   const db = getDb(options.cwd);
-  const sortedLoops = Object.entries(config.loops)
-    .sort(([, a], [, b]) => a.order - b.order);
 
-  console.log();
-  console.log(chalk.bold('  RalphFlow \u2014 E2E'));
-  console.log();
+  // Reset DB state — rely on tracker detection, not stale DB from previous runs
+  for (const loop of Object.values(config.loops)) {
+    resetLoopState(db, flowName, loop.name);
+  }
 
-  for (const [key, loop] of sortedLoops) {
-    const loopKey = loop.name;
+  let cycle = 1;
 
-    // DB check: skip completed loops
-    if (isLoopComplete(db, flowName, loopKey)) {
-      console.log(chalk.green(`  \u2713 ${loop.name} \u2014 complete, skipping`));
-      continue;
-    }
-    // Tracker check: maybe completed since last run
-    if (checkTrackerForCompletion(flowDir, loop) || checkTrackerCheckboxes(flowDir, loop) || checkTrackerMetadataCompletion(flowDir, loop)) {
-      markLoopComplete(db, flowName, loopKey);
-      console.log(chalk.green(`  \u2713 ${loop.name} \u2014 complete, skipping`));
-      continue;
-    }
+  while (true) {
+    const sortedLoops = Object.entries(config.loops)
+      .sort(([, a], [, b]) => a.order - b.order);
 
-    markLoopRunning(db, flowName, loopKey);
-    console.log(chalk.bold(`  \u2192 ${loop.name}`));
-
-    let agentName: string | undefined;
-    let agentDir: string | undefined;
-
-    if (isMultiAgentLoop(loop)) {
-      agentDir = agentsDir(flowDir, loop);
-      agentName = acquireAgentId(agentDir, (loop.multi_agent as MultiAgentConfig).max_agents);
-    }
-
-    try {
-      await iterationLoop(key, loop, flowDir, options, agentName, db, flowName);
-    } finally {
-      if (agentDir && agentName) releaseAgentId(agentDir, agentName);
-    }
-
-    // Summary after loop
-    if (isLoopComplete(db, flowName, loopKey)) {
-      console.log(chalk.green(`  \u2713 ${loop.name} \u2014 done`));
-    } else {
-      console.log(chalk.yellow(`  \u26a0 ${loop.name} \u2014 max iterations, advancing`));
-    }
     console.log();
+    console.log(chalk.bold(`  RalphFlow \u2014 E2E` + (cycle > 1 ? ` (cycle ${cycle})` : '')));
+    console.log();
+
+    let anyLoopRan = false;
+
+    for (let idx = 0; idx < sortedLoops.length; idx++) {
+      const [key, loop] = sortedLoops[idx];
+      const loopKey = loop.name;
+      const isFirstLoop = idx === 0;
+
+      // First loop (story discovery) always re-enters to scan for new work.
+      // Other loops: skip if already complete.
+      if (!isFirstLoop) {
+        // DB check: skip loops completed earlier in this cycle
+        if (isLoopComplete(db, flowName, loopKey)) {
+          console.log(chalk.green(`  \u2713 ${loop.name} \u2014 complete, skipping`));
+          continue;
+        }
+        // Tracker check: detect completion from tracker state
+        if (checkTrackerForCompletion(flowDir, loop) || checkTrackerMetadataCompletion(flowDir, loop) || checkTrackerAllChecked(flowDir, loop)) {
+          markLoopComplete(db, flowName, loopKey);
+          console.log(chalk.green(`  \u2713 ${loop.name} \u2014 complete, skipping`));
+          continue;
+        }
+      }
+
+      anyLoopRan = true;
+      markLoopRunning(db, flowName, loopKey);
+      console.log(chalk.bold(`  \u2192 ${loop.name}`));
+
+      let agentName: string | undefined;
+      let agentDir: string | undefined;
+
+      if (isMultiAgentLoop(loop)) {
+        agentDir = agentsDir(flowDir, loop);
+        agentName = acquireAgentId(agentDir, (loop.multi_agent as MultiAgentConfig).max_agents);
+      }
+
+      try {
+        await iterationLoop(key, loop, flowDir, options, agentName, db, flowName, isFirstLoop);
+      } finally {
+        if (agentDir && agentName) releaseAgentId(agentDir, agentName);
+      }
+
+      // Summary after loop
+      if (isLoopComplete(db, flowName, loopKey)) {
+        console.log(chalk.green(`  \u2713 ${loop.name} \u2014 done`));
+      } else {
+        console.log(chalk.yellow(`  \u26a0 ${loop.name} \u2014 max iterations, advancing`));
+      }
+      console.log();
+    }
+
+    // Check if there are undelivered stories — if so, cycle again
+    if (!hasUndeliveredStories(flowDir, config)) {
+      break;
+    }
+
+    console.log(chalk.cyan('  \u21bb Undelivered stories found \u2014 starting new cycle'));
+    prepareNextCycle(flowDir, config, db, flowName);
+    cycle++;
   }
 
   console.log(chalk.green('  \u2713 E2E complete'));
+}
+
+// ---------------------------------------------------------------------------
+// Cycling helpers — detect undelivered stories and reset for next cycle
+// ---------------------------------------------------------------------------
+
+function hasUndeliveredStories(flowDir: string, config: RalphFlowConfig): boolean {
+  const storyEntity = config.entities?.STORY;
+  if (!storyEntity) return false;
+
+  // Read all story IDs from stories.md
+  const storiesPath = join(flowDir, storyEntity.data_file);
+  if (!existsSync(storiesPath)) return false;
+  const storiesContent = readFileSync(storiesPath, 'utf-8');
+  const storyIds = [...storiesContent.matchAll(/^## (STORY-\d+):/gm)].map(m => m[1]);
+  if (storyIds.length === 0) return false;
+
+  // Find delivery loop (last by order)
+  const sortedLoops = Object.values(config.loops).sort((a, b) => a.order - b.order);
+  const deliveryLoop = sortedLoops[sortedLoops.length - 1];
+  if (!deliveryLoop) return false;
+
+  // Read delivered story IDs from the Delivered section
+  const deliveryTrackerPath = join(flowDir, deliveryLoop.tracker);
+  if (!existsSync(deliveryTrackerPath)) return true; // no tracker = nothing delivered
+  const deliveryContent = readFileSync(deliveryTrackerPath, 'utf-8');
+
+  const deliveredSection = deliveryContent.split('## Delivered')[1] || '';
+  const deliveredIds = [...deliveredSection.matchAll(/\[x\]\s*(STORY-\d+)/gi)].map(m => m[1]);
+
+  return storyIds.some(id => !deliveredIds.includes(id));
+}
+
+function prepareNextCycle(
+  flowDir: string,
+  config: RalphFlowConfig,
+  db: Database.Database,
+  flowName: string,
+): void {
+  const sortedLoops = Object.entries(config.loops).sort(([, a], [, b]) => a.order - b.order);
+
+  // Reset DB state for all loops
+  for (const [, loop] of sortedLoops) {
+    resetLoopState(db, flowName, loop.name);
+  }
+
+  // --- Story tracker: remove completion string, add new stories as unchecked ---
+  const storyLoop = sortedLoops.find(([key]) => key.includes('story'));
+  if (storyLoop) {
+    const [, storyLoopConfig] = storyLoop;
+    const trackerPath = join(flowDir, storyLoopConfig.tracker);
+    if (existsSync(trackerPath)) {
+      let content = readFileSync(trackerPath, 'utf-8');
+
+      // Remove completion strings
+      content = content.replace(new RegExp(`<promise>${storyLoopConfig.completion}</promise>`, 'g'), '');
+      content = content.replace(new RegExp(storyLoopConfig.completion, 'g'), '');
+
+      // Find stories not yet in the queue
+      const storyEntity = config.entities?.STORY;
+      if (storyEntity) {
+        const storiesPath = join(flowDir, storyEntity.data_file);
+        if (existsSync(storiesPath)) {
+          const storiesContent = readFileSync(storiesPath, 'utf-8');
+          const allStories = [...storiesContent.matchAll(/^## (STORY-\d+): (.+)$/gm)]
+            .map(m => ({ id: m[1], title: m[2] }));
+
+          const existingIds = [...content.matchAll(/\[[ x]\]\s*(STORY-\d+)/gi)].map(m => m[1]);
+          const newStories = allStories.filter(s => !existingIds.includes(s.id));
+
+          if (newStories.length > 0) {
+            // Add new stories as unchecked items to the Stories Queue section
+            const queueSection = '## Stories Queue';
+            const queueIdx = content.indexOf(queueSection);
+            if (queueIdx !== -1) {
+              const afterQueue = content.indexOf('\n##', queueIdx + queueSection.length);
+              const insertPos = afterQueue !== -1 ? afterQueue : content.length;
+              const newEntries = newStories.map(s => `- [ ] ${s.id}: ${s.title}`).join('\n');
+              content = content.slice(0, insertPos) + '\n' + newEntries + '\n' + content.slice(insertPos);
+            }
+          }
+        }
+      }
+
+      // Reset metadata
+      content = content.replace(/^- active_story: .+$/m, '- active_story: none');
+      content = content.replace(/^- stage: .+$/m, '- stage: analyze');
+      // Update completed/pending lists — leave completed as-is, clear pending
+      content = content.replace(/^- pending_stories: .+$/m, '- pending_stories: []');
+
+      writeFileSync(trackerPath, content);
+    }
+  }
+
+  // --- Delivery tracker: remove completion string, clear queue, keep Delivered ---
+  const deliveryLoop = sortedLoops[sortedLoops.length - 1];
+  if (deliveryLoop) {
+    const [, deliveryLoopConfig] = deliveryLoop;
+    const trackerPath = join(flowDir, deliveryLoopConfig.tracker);
+    if (existsSync(trackerPath)) {
+      let content = readFileSync(trackerPath, 'utf-8');
+
+      // Remove completion strings
+      content = content.replace(new RegExp(`<promise>${deliveryLoopConfig.completion}</promise>`, 'g'), '');
+      content = content.replace(new RegExp(deliveryLoopConfig.completion, 'g'), '');
+
+      // Clear Delivery Queue section (between ## Delivery Queue and ## Delivered)
+      content = content.replace(
+        /(## Delivery Queue\n)[\s\S]*?(## Delivered)/,
+        '$1\n$2',
+      );
+
+      // Reset metadata
+      content = content.replace(/^- active_story: .+$/m, '- active_story: none');
+      content = content.replace(/^- stage: .+$/m, '- stage: idle');
+      content = content.replace(/^- feedback: .+$/m, '- feedback: none');
+
+      writeFileSync(trackerPath, content);
+    }
+  }
 }
 
 function readPrompt(loop: LoopConfig, flowDir: string, agentName?: string): string {

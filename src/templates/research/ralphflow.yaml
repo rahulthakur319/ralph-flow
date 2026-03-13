@@ -27,6 +27,7 @@ loops:
     completion: "ALL TOPICS DISCOVERED"
     feeds: [research-loop]
     multi_agent: false
+    model: claude-sonnet-4-6
     cadence: 0
 
   research-loop:
@@ -41,6 +42,7 @@ loops:
     completion: "ALL TOPICS RESEARCHED"
     fed_by: [discovery-loop]
     feeds: [story-loop]
+    model: claude-sonnet-4-6
     multi_agent:
       enabled: true
       max_agents: 4
@@ -65,6 +67,7 @@ loops:
     fed_by: [research-loop]
     feeds: [document-loop]
     multi_agent: false
+    model: claude-sonnet-4-6
     cadence: 0
 
   document-loop:
@@ -77,4 +80,5 @@ loops:
     completion: "DOCUMENT COMPLETE"
     fed_by: [story-loop]
     multi_agent: false
+    model: claude-sonnet-4-6
     cadence: 0
