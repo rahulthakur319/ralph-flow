@@ -95,7 +95,7 @@ Same pattern in `template.ts` and `server.ts`.
 4. Metadata: all items have `{status: completed}`, none `in_progress`/`pending`
 
 ### Per-Loop Model Configuration
-Each loop in `ralphflow.yaml` supports an optional `model` field (e.g., `model: claude-sonnet-4-6`). The runner resolves the effective model as: CLI `--model` flag (global override) → per-loop `model` from config → Claude default. Both built-in templates default all loops to `claude-sonnet-4-6`.
+Each loop in `ralphflow.yaml` supports an optional `model` field (e.g., `model: claude-sonnet-4-6`). The runner resolves the effective model as: CLI `--model` flag (global override) → per-loop `model` from config → Claude default. Both built-in templates default all loops to `claude-sonnet-4-6`. The dashboard Edit panel includes a model selector dropdown that calls `PUT /api/apps/:app/config/model` to update the loop's model in `ralphflow.yaml`. Selecting "Default" removes the model field.
 
 ### Multi-Agent Coordination
 - PID-based lock files in `.agents/` directory next to tracker
