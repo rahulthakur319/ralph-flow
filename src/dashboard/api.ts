@@ -118,7 +118,9 @@ export function createApiRoutes(cwd: string, port: number = 4242): Hono {
     const appName = c.req.param('app');
     const flowDir = resolveFlowDir(cwd, appName);
     const config = loadConfig(flowDir);
-    return c.json(config);
+    const configPath = join(flowDir, 'ralphflow.yaml');
+    const rawYaml = existsSync(configPath) ? readFileSync(configPath, 'utf-8') : '';
+    return c.json({ ...config, _rawYaml: rawYaml });
   });
 
   // GET /api/apps/:app/db — SQLite loop_state rows

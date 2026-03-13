@@ -390,6 +390,49 @@
     min-height: 200px;
   }
 
+  /* Edit tabs */
+  .edit-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .edit-tab {
+    padding: 10px 16px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.1s, border-color 0.1s;
+  }
+  .edit-tab:hover { color: var(--text); }
+  .edit-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+
+  /* Read-only code viewer */
+  .code-viewer {
+    width: 100%;
+    flex: 1;
+    min-height: 200px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 16px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    margin: 0;
+  }
+
   /* Tracker viewer */
   .tracker-viewer {
     background: var(--bg-surface);
@@ -654,6 +697,8 @@
   let promptOriginal = '';
   let ws = null;
   let reconnectDelay = 1000;
+  let activeEditTab = 'prompt';
+  let cachedPromptValue = null;
 
   // DOM refs
   const $ = (sel) => document.querySelector(sel);
@@ -812,6 +857,8 @@
     selectedApp = app;
     selectedLoop = app.loops.length > 0 ? app.loops[0].key : null;
     promptDirty = false;
+    activeEditTab = 'prompt';
+    cachedPromptValue = null;
     renderSidebar();
     renderContent();
     fetchAppStatus(app.appName);
@@ -820,6 +867,8 @@
   function selectLoop(loopKey) {
     selectedLoop = loopKey;
     promptDirty = false;
+    activeEditTab = 'prompt';
+    cachedPromptValue = null;
     renderSidebar();
     renderContent();
   }
@@ -907,20 +956,14 @@
       html += '</div></div>'; // close .panel-body + .panel-progress
       html += '</div>'; // close .panel-col-left
 
-      // Right column: Edit panel
+      // Right column: Edit panel with tabs
       html += `<div class="panel panel-edit">
-        <div class="panel-header">Edit</div>
-        <div class="panel-body">
-          <div class="editor-wrap">
-            <textarea class="editor" id="promptEditor" placeholder="Loading..."></textarea>
-            <div class="editor-actions">
-              <button class="btn btn-primary" id="savePromptBtn" disabled>Save</button>
-              <button class="btn" id="resetPromptBtn" disabled>Reset</button>
-              <span class="dirty-indicator" id="dirtyIndicator" style="display:none">Unsaved changes</span>
-              <span class="save-ok" id="saveOk" style="display:none">Saved</span>
-            </div>
-          </div>
+        <div class="edit-tabs">
+          <button class="edit-tab${activeEditTab === 'prompt' ? ' active' : ''}" data-tab="prompt">Prompt</button>
+          <button class="edit-tab${activeEditTab === 'tracker' ? ' active' : ''}" data-tab="tracker">Tracker</button>
+          <button class="edit-tab${activeEditTab === 'config' ? ' active' : ''}" data-tab="config">Config</button>
         </div>
+        <div class="panel-body" id="editTabContent"></div>
       </div>`;
 
       html += '</div>'; // close .panel-grid
@@ -933,11 +976,40 @@
       el.addEventListener('click', () => selectLoop(el.dataset.loop));
     });
 
-    // Load prompt + tracker
+    // Bind edit tabs + load content
     if (currentLoop) {
-      loadPrompt(app.appName, currentLoop.key);
+      content.querySelectorAll('.edit-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchEditTab(tab.dataset.tab, app.appName, currentLoop.key));
+      });
+      renderEditTabContent(app.appName, currentLoop.key);
       loadTracker(app.appName, currentLoop.key);
     }
+  }
+
+  function bindPromptEditor(appName, loopKey) {
+    const editor = $('#promptEditor');
+    if (!editor) return;
+
+    editor.addEventListener('input', () => {
+      promptDirty = editor.value !== promptOriginal;
+      updateDirtyState();
+    });
+
+    editor.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        savePrompt(appName, loopKey);
+      }
+    });
+
+    const saveBtn = $('#savePromptBtn');
+    const resetBtn = $('#resetPromptBtn');
+    if (saveBtn) saveBtn.addEventListener('click', () => savePrompt(appName, loopKey));
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+      editor.value = promptOriginal;
+      promptDirty = false;
+      updateDirtyState();
+    });
   }
 
   async function loadPrompt(appName, loopKey) {
@@ -950,31 +1022,10 @@
       promptOriginal = editor.value;
       promptDirty = false;
       updateDirtyState();
-
-      editor.addEventListener('input', () => {
-        promptDirty = editor.value !== promptOriginal;
-        updateDirtyState();
-      });
-
-      // Cmd/Ctrl+S to save
-      editor.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-          e.preventDefault();
-          savePrompt(appName, loopKey);
-        }
-      });
-
-      const saveBtn = $('#savePromptBtn');
-      const resetBtn = $('#resetPromptBtn');
-      if (saveBtn) saveBtn.addEventListener('click', () => savePrompt(appName, loopKey));
-      if (resetBtn) resetBtn.addEventListener('click', () => {
-        editor.value = promptOriginal;
-        promptDirty = false;
-        updateDirtyState();
-      });
     } catch {
       editor.value = '(Error loading prompt)';
     }
+    bindPromptEditor(appName, loopKey);
   }
 
   async function savePrompt(appName, loopKey) {
@@ -1018,6 +1069,77 @@
       viewer.innerHTML = renderMarkdown(data.content || '(empty)');
     } catch {
       viewer.innerHTML = '(No tracker file found)';
+    }
+  }
+
+  function switchEditTab(tab, appName, loopKey) {
+    if (tab === activeEditTab) return;
+    if (activeEditTab === 'prompt') {
+      const editor = $('#promptEditor');
+      if (editor) {
+        cachedPromptValue = editor.value;
+      }
+    }
+    activeEditTab = tab;
+    document.querySelectorAll('.edit-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === tab);
+    });
+    renderEditTabContent(appName, loopKey);
+  }
+
+  function renderEditTabContent(appName, loopKey) {
+    const container = $('#editTabContent');
+    if (!container) return;
+
+    if (activeEditTab === 'prompt') {
+      container.innerHTML = `<div class="editor-wrap">
+        <textarea class="editor" id="promptEditor" placeholder="Loading..."></textarea>
+        <div class="editor-actions">
+          <button class="btn btn-primary" id="savePromptBtn" disabled>Save</button>
+          <button class="btn" id="resetPromptBtn" disabled>Reset</button>
+          <span class="dirty-indicator" id="dirtyIndicator" style="display:none">Unsaved changes</span>
+          <span class="save-ok" id="saveOk" style="display:none">Saved</span>
+        </div>
+      </div>`;
+      if (cachedPromptValue !== null) {
+        const editor = $('#promptEditor');
+        if (editor) {
+          editor.value = cachedPromptValue;
+          updateDirtyState();
+          bindPromptEditor(appName, loopKey);
+        }
+        cachedPromptValue = null;
+      } else {
+        loadPrompt(appName, loopKey);
+      }
+    } else if (activeEditTab === 'tracker') {
+      container.innerHTML = '<pre class="code-viewer" id="editTrackerViewer">Loading...</pre>';
+      loadEditTracker(appName, loopKey);
+    } else if (activeEditTab === 'config') {
+      container.innerHTML = '<pre class="code-viewer" id="editConfigViewer">Loading...</pre>';
+      loadEditConfig(appName);
+    }
+  }
+
+  async function loadEditTracker(appName, loopKey) {
+    const viewer = $('#editTrackerViewer');
+    if (!viewer) return;
+    try {
+      const data = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/loops/${encodeURIComponent(loopKey)}/tracker`);
+      viewer.textContent = data.content || '(empty)';
+    } catch {
+      viewer.textContent = '(No tracker file found)';
+    }
+  }
+
+  async function loadEditConfig(appName) {
+    const viewer = $('#editConfigViewer');
+    if (!viewer) return;
+    try {
+      const data = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/config`);
+      viewer.textContent = data._rawYaml || JSON.stringify(data, null, 2);
+    } catch {
+      viewer.textContent = '(Error loading config)';
     }
   }
 
