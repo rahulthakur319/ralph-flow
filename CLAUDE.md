@@ -131,7 +131,7 @@ The runner sets `RALPHFLOW_APP` (flow directory basename, e.g. `code-implementat
 - `notification:dismissed` — broadcast when DELETE /api/notification/:id removes one
 
 ### Dashboard Notification UI (ui/index.html)
-The Interactive panel (left column, top) renders per-loop attention notifications. Notifications are stored in `notificationsList` (client-side array hydrated from `GET /api/notifications` on load). Each card shows timestamp, message, and dismiss (X) button. Sidebar loop items display a `.notif-badge` count for undismissed notifications. Browser `Notification` API permission is requested on first notification; desktop toasts fire when the tab is in the background.
+The Interactive panel (left column, top) renders per-loop attention notifications. Notifications are stored in `notificationsList` (client-side array hydrated from `GET /api/notifications` on load). Each card shows timestamp, message, and dismiss (X) button. Sidebar loop items display a `.notif-badge` count for undismissed notifications. Browser `Notification` API permission is requested on first notification; desktop toasts fire when the tab is in the background. An audible two-note chime (Web Audio API, ~250ms) plays on each notification — AudioContext is lazily initialized on first user interaction to satisfy browser autoplay policies.
 
 ## Conventions
 
