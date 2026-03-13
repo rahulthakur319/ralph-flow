@@ -8,13 +8,12 @@ Multi-agent AI workflow orchestration framework for Claude Code. Define pipeline
 src/
 ├── bin/ralphflow.ts          — CLI entry point (shebang, parses commander program)
 ├── cli/
-│   ├── index.ts              — Commander program: mounts all commands, default → interactive menu
+│   ├── index.ts              — Commander program: mounts all commands, default → start dashboard + open browser
 │   ├── init.ts               — `init` command: scaffold flow from template
 │   ├── run.ts                — `run <loop>` command: single/multi-agent loop execution, --ui flag
 │   ├── e2e.ts                — `e2e` command: orchestrated all-loops execution with SQLite, --ui flag
 │   ├── status.ts             — `status` command: renders loop status table
-│   ├── dashboard.ts          — `dashboard` command (alias: `ui`): starts web server
-│   └── menu.ts               — Interactive menu via @inquirer/prompts
+│   └── dashboard.ts          — `dashboard` command (alias: `ui`): starts web server
 ├── core/
 │   ├── index.ts              — Public API re-exports
 │   ├── types.ts              — All TypeScript interfaces (RalphFlowConfig, LoopConfig, TrackerStatus, etc.)
@@ -41,7 +40,7 @@ src/
 
 - **Language:** TypeScript 5.6, ESM (`"type": "module"`, `.js` import extensions)
 - **Bundler:** tsup (esbuild-based), single entry point → `dist/`
-- **CLI:** commander.js for commands, @inquirer/prompts for interactive menus
+- **CLI:** commander.js for commands
 - **Database:** better-sqlite3 with WAL mode for loop state persistence
 - **Web:** Hono + @hono/node-server (HTTP), ws (WebSocket), chokidar (file watching)
 - **Utilities:** chalk (terminal colors), cli-table3 (ASCII tables), yaml (YAML parsing), simple-git
@@ -60,7 +59,7 @@ npm run lint         # eslint src/
 
 ```
 ralphflow
-├── (no args)              → interactive menu
+├── (no args)              → start dashboard + open browser
 ├── init                   → scaffold new flow
 │   ├── -t, --template     (code-implementation | research)
 │   └── -n, --name         flow name
@@ -145,7 +144,7 @@ The Interactive panel (left column, top) renders per-loop attention notification
 - Config lives in `.ralph-flow/<appName>/ralphflow.yaml`
 - No test framework — verification is manual and via the dashboard
 - `package.json` `files` field: `dist/`, `src/templates/`, `src/dashboard/ui/`
-- External deps `@inquirer/prompts` and `better-sqlite3` are marked external in tsup (not bundled)
+- External dep `better-sqlite3` is marked external in tsup (not bundled)
 
 ## Publishing
 
