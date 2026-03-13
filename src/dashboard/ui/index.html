@@ -874,6 +874,161 @@
     color: #000;
     font-weight: 600;
   }
+
+  /* App-level tabs (Loops / Archives) */
+  .app-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .app-tab {
+    padding: 10px 20px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.1s, border-color 0.1s;
+  }
+  .app-tab:hover { color: var(--text); }
+  .app-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+
+  /* Archive timeline */
+  .archive-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .archive-empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .archive-empty-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+  .archive-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .archive-card:hover { border-color: var(--text-dim); }
+  .archive-card.expanded { border-color: var(--accent); }
+  .archive-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .archive-card-header:hover { background: var(--bg-hover); }
+  .archive-card-date {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .archive-card-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .archive-card-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .archive-card-stat .stat-val {
+    font-family: var(--mono);
+    color: var(--text);
+  }
+  .archive-card-chevron {
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    margin-left: 12px;
+  }
+  .archive-card.expanded .archive-card-chevron {
+    transform: rotate(90deg);
+  }
+
+  /* Archive file browser */
+  .archive-files {
+    border-top: 1px solid var(--border);
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .archive-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 1px solid var(--border);
+  }
+  .archive-file-item:last-child { border-bottom: none; }
+  .archive-file-item:hover { background: var(--bg-hover); color: var(--text); }
+  .archive-file-item.active { background: var(--bg-active); color: var(--accent); }
+  .archive-file-icon { opacity: 0.5; font-size: 11px; }
+
+  /* Archive file viewer (inline) */
+  .archive-file-viewer {
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    max-height: 500px;
+  }
+  .archive-file-viewer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--bg-active);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .archive-file-viewer-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .archive-file-viewer-close:hover { color: var(--text); }
+  .archive-file-content {
+    flex: 1;
+    overflow: auto;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background: var(--bg);
+    color: var(--text);
+  }
 </style>
 </head>
 <body>
@@ -919,6 +1074,11 @@
   let notifPermissionRequested = false;
   let audioCtx = null;
   let audioCtxInitialized = false;
+  let activeAppTab = 'loops';
+  let archivesData = [];
+  let expandedArchive = null;
+  let archiveFilesCache = {};
+  let viewingArchiveFile = null;
 
   // DOM refs
   const $ = (sel) => document.querySelector(sel);
@@ -1093,6 +1253,11 @@
     promptDirty = false;
     activeEditTab = 'prompt';
     cachedPromptValue = null;
+    activeAppTab = 'loops';
+    archivesData = [];
+    expandedArchive = null;
+    archiveFilesCache = {};
+    viewingArchiveFile = null;
     document.title = app.appName + ' - RalphFlow Dashboard';
     renderSidebar();
     renderContent();
@@ -1134,6 +1299,27 @@
       </div>
       ${app.description ? `<div class="app-desc">${esc(app.description)}</div>` : ''}
     </div>`;
+
+    // App-level tabs: Loops | Archives
+    html += `<div class="app-tabs">
+      <button class="app-tab${activeAppTab === 'loops' ? ' active' : ''}" data-app-tab="loops">Loops</button>
+      <button class="app-tab${activeAppTab === 'archives' ? ' active' : ''}" data-app-tab="archives">Archives</button>
+    </div>`;
+
+    if (activeAppTab === 'archives') {
+      html += '<div id="archivesContainer">Loading archives...</div>';
+      content.innerHTML = html;
+
+      // Bind app tab clicks
+      content.querySelectorAll('.app-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchAppTab(tab.dataset.appTab));
+      });
+
+      loadArchives(app.appName);
+      return;
+    }
+
+    // --- Loops tab content ---
 
     // Pipeline
     html += '<div class="section"><div class="section-title">Pipeline</div><div class="pipeline">';
@@ -1254,6 +1440,11 @@
     }
 
     content.innerHTML = html;
+
+    // Bind app-level tab clicks
+    content.querySelectorAll('.app-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchAppTab(tab.dataset.appTab));
+    });
 
     // Bind pipeline node clicks
     content.querySelectorAll('.pipeline-node').forEach(el => {
@@ -1762,6 +1953,171 @@
   }
   document.addEventListener('click', onFirstInteraction);
   document.addEventListener('keydown', onFirstInteraction);
+
+  // App-level tab switching (Loops / Archives)
+  function switchAppTab(tab) {
+    if (tab === activeAppTab) return;
+    activeAppTab = tab;
+    expandedArchive = null;
+    archiveFilesCache = {};
+    viewingArchiveFile = null;
+    renderContent();
+  }
+
+  // Archives view
+  async function loadArchives(appName) {
+    const container = document.getElementById('archivesContainer');
+    if (!container) return;
+
+    try {
+      archivesData = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/archives`);
+      renderArchivesView(container, appName);
+    } catch {
+      container.innerHTML = '<div class="archive-empty"><div>Error loading archives</div></div>';
+    }
+  }
+
+  function renderArchivesView(container, appName) {
+    if (archivesData.length === 0) {
+      container.innerHTML = `<div class="archive-empty">
+        <div class="archive-empty-icon">&#128451;</div>
+        <div>No archives yet</div>
+        <div style="margin-top:8px;font-size:12px">Use the Archive button to snapshot current work</div>
+      </div>`;
+      return;
+    }
+
+    let html = '<div class="archive-timeline">';
+    for (const archive of archivesData) {
+      const isExpanded = expandedArchive === archive.timestamp;
+      const dateStr = formatArchiveTimestamp(archive.timestamp);
+      html += `<div class="archive-card${isExpanded ? ' expanded' : ''}" data-archive="${esc(archive.timestamp)}">
+        <div class="archive-card-header" data-archive-toggle="${esc(archive.timestamp)}">
+          <span class="archive-card-date">${esc(dateStr)}</span>
+          <div class="archive-card-stats">
+            <span class="archive-card-stat">Stories: <span class="stat-val">${archive.summary.storyCount}</span></span>
+            <span class="archive-card-stat">Tasks: <span class="stat-val">${archive.summary.taskCount}</span></span>
+            <span class="archive-card-stat">Files: <span class="stat-val">${archive.fileCount}</span></span>
+            <span class="archive-card-chevron">&#9654;</span>
+          </div>
+        </div>`;
+
+      if (isExpanded) {
+        const files = archiveFilesCache[archive.timestamp];
+        if (files) {
+          html += '<div class="archive-files">';
+          for (const file of files) {
+            const isActive = viewingArchiveFile === file.path;
+            html += `<div class="archive-file-item${isActive ? ' active' : ''}" data-archive-file="${esc(file.path)}" data-archive-ts="${esc(archive.timestamp)}">
+              <span class="archive-file-icon">&#128196;</span>
+              <span>${esc(file.path)}</span>
+            </div>`;
+          }
+          html += '</div>';
+
+          if (viewingArchiveFile) {
+            html += `<div class="archive-file-viewer">
+              <div class="archive-file-viewer-header">
+                <span>${esc(viewingArchiveFile)}</span>
+                <button class="archive-file-viewer-close" data-close-viewer="true">&times;</button>
+              </div>
+              <div class="archive-file-content" id="archiveFileContent">Loading...</div>
+            </div>`;
+          }
+        } else {
+          html += '<div class="archive-files" style="padding:16px;color:var(--text-dim);font-size:12px">Loading files...</div>';
+        }
+      }
+
+      html += '</div>';
+    }
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    // Bind archive card toggle clicks
+    container.querySelectorAll('.archive-card-header').forEach(header => {
+      header.addEventListener('click', () => toggleArchiveCard(appName, header.dataset.archiveToggle));
+    });
+
+    // Bind archive file clicks
+    container.querySelectorAll('.archive-file-item').forEach(item => {
+      item.addEventListener('click', () => {
+        viewArchiveFile(appName, item.dataset.archiveTs, item.dataset.archiveFile);
+      });
+    });
+
+    // Bind file viewer close button
+    const closeBtn = container.querySelector('[data-close-viewer]');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        viewingArchiveFile = null;
+        renderArchivesView(container, appName);
+      });
+    }
+
+    // Load file content if viewer is open
+    if (viewingArchiveFile && expandedArchive) {
+      loadArchiveFileContent(appName, expandedArchive, viewingArchiveFile);
+    }
+  }
+
+  async function toggleArchiveCard(appName, timestamp) {
+    const container = document.getElementById('archivesContainer');
+    if (!container) return;
+
+    if (expandedArchive === timestamp) {
+      expandedArchive = null;
+      viewingArchiveFile = null;
+      renderArchivesView(container, appName);
+      return;
+    }
+
+    expandedArchive = timestamp;
+    viewingArchiveFile = null;
+
+    // Load files if not cached
+    if (!archiveFilesCache[timestamp]) {
+      renderArchivesView(container, appName);
+      try {
+        const files = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/archives/${encodeURIComponent(timestamp)}/files`);
+        archiveFilesCache[timestamp] = files;
+      } catch {
+        archiveFilesCache[timestamp] = [];
+      }
+    }
+
+    renderArchivesView(container, appName);
+  }
+
+  async function viewArchiveFile(appName, timestamp, filePath) {
+    const container = document.getElementById('archivesContainer');
+    if (!container) return;
+
+    viewingArchiveFile = filePath;
+    renderArchivesView(container, appName);
+  }
+
+  async function loadArchiveFileContent(appName, timestamp, filePath) {
+    const contentEl = document.getElementById('archiveFileContent');
+    if (!contentEl) return;
+
+    try {
+      const data = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/archives/${encodeURIComponent(timestamp)}/files/${filePath}`);
+      contentEl.textContent = data.content || '(empty file)';
+    } catch {
+      contentEl.textContent = '(Error loading file)';
+    }
+  }
+
+  function formatArchiveTimestamp(ts) {
+    // Format: 2026-03-14_15-30 → Mar 14, 2026 at 15:30
+    const match = ts.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})/);
+    if (!match) return ts;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const [, year, month, day, hour, min] = match;
+    return `${months[parseInt(month, 10) - 1]} ${parseInt(day, 10)}, ${year} at ${hour}:${min}`;
+  }
 
   // Delete App Modal — exposed globally for inline onclick handlers
   window.openDeleteAppModal = openDeleteAppModal;
