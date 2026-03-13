@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { WebSocketServer, WebSocket } from 'ws';
 import { listFlows, resolveFlowDir, loadConfig } from '../core/config.js';
 import { parseTracker } from '../core/status.js';
 import { getDb, getAllLoopStates } from '../core/db.js';
@@ -9,7 +11,31 @@ import type { RalphFlowConfig } from '../core/types.js';
 
 const TEMPLATES = ['code-implementation', 'research'] as const;
 
-export function createApiRoutes(cwd: string, port: number = 4242): Hono {
+// ---------------------------------------------------------------------------
+// In-memory notification store
+// ---------------------------------------------------------------------------
+
+interface Notification {
+  id: string;
+  timestamp: string;
+  app: string;
+  loop: string;
+  payload: unknown;
+}
+
+const notifications: Notification[] = [];
+
+function broadcastWs(wss: WebSocketServer | undefined, event: unknown): void {
+  if (!wss) return;
+  const data = JSON.stringify(event);
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(data);
+    }
+  }
+}
+
+export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocketServer): Hono {
   const api = new Hono();
 
   // GET /api/context — working directory info
@@ -208,6 +234,49 @@ export function createApiRoutes(cwd: string, port: number = 4242): Hono {
       isDirectory: d.isDirectory(),
     }));
     return c.json({ files });
+  });
+
+  // POST /api/notification — receive a notification from a Claude hook
+  api.post('/api/notification', async (c) => {
+    const app = c.req.query('app') || 'unknown';
+    const loop = c.req.query('loop') || 'unknown';
+
+    let payload: unknown = {};
+    try {
+      payload = await c.req.json();
+    } catch {
+      // Body may be empty or malformed — store with empty payload
+    }
+
+    const notification: Notification = {
+      id: randomUUID(),
+      timestamp: new Date().toISOString(),
+      app,
+      loop,
+      payload,
+    };
+
+    notifications.push(notification);
+    broadcastWs(wss, { type: 'notification:attention', notification });
+
+    return c.json(notification, 200);
+  });
+
+  // GET /api/notifications — return all active (undismissed) notifications
+  api.get('/api/notifications', (c) => {
+    return c.json(notifications);
+  });
+
+  // DELETE /api/notification/:id — dismiss a notification by ID
+  api.delete('/api/notification/:id', (c) => {
+    const id = c.req.param('id');
+    const idx = notifications.findIndex((n) => n.id === id);
+    if (idx === -1) {
+      return c.json({ error: 'Notification not found' }, 404);
+    }
+    notifications.splice(idx, 1);
+    broadcastWs(wss, { type: 'notification:dismissed', id });
+    return c.json({ ok: true });
   });
 
   return api;

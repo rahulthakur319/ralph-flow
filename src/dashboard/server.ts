@@ -31,14 +31,17 @@ export async function startDashboard(options: { cwd: string; port?: number }): P
 
   const app = new Hono();
 
+  // WebSocket server in noServer mode (created early so API routes can broadcast)
+  const wss = new WebSocketServer({ noServer: true });
+
   // CORS for localhost
   app.use('*', cors({
     origin: (origin) => origin || '*',
     allowMethods: ['GET', 'PUT', 'POST', 'DELETE'],
   }));
 
-  // Mount API routes
-  const apiRoutes = createApiRoutes(cwd, port);
+  // Mount API routes (with wss for notification broadcasting)
+  const apiRoutes = createApiRoutes(cwd, port, wss);
   app.route('/', apiRoutes);
 
   // Serve index.html at root
@@ -54,9 +57,6 @@ export async function startDashboard(options: { cwd: string; port?: number }): P
     port,
     hostname: '127.0.0.1',
   });
-
-  // WebSocket server in noServer mode
-  const wss = new WebSocketServer({ noServer: true });
 
   // Handle upgrade requests for /ws path
   (server as any).on('upgrade', (request: IncomingMessage, socket: Duplex, head: Buffer) => {
