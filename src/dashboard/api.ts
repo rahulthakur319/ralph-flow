@@ -6,8 +6,17 @@ import { parseTracker } from '../core/status.js';
 import { getDb, getAllLoopStates } from '../core/db.js';
 import type { RalphFlowConfig } from '../core/types.js';
 
-export function createApiRoutes(cwd: string): Hono {
+export function createApiRoutes(cwd: string, port: number = 4242): Hono {
   const api = new Hono();
+
+  // GET /api/context — working directory info
+  api.get('/api/context', (c) => {
+    return c.json({
+      cwd,
+      projectName: basename(cwd),
+      port,
+    });
+  });
 
   // GET /api/apps — list all apps with metadata
   api.get('/api/apps', (c) => {

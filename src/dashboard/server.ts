@@ -38,7 +38,7 @@ export async function startDashboard(options: { cwd: string; port?: number }): P
   }));
 
   // Mount API routes
-  const apiRoutes = createApiRoutes(cwd);
+  const apiRoutes = createApiRoutes(cwd, port);
   app.route('/', apiRoutes);
 
   // Serve index.html at root
