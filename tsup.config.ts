@@ -6,5 +6,5 @@ export default defineConfig({
   target: 'node18',
   dts: false,
   clean: true,
-  external: ['@inquirer/prompts', 'better-sqlite3'],
+  external: ['better-sqlite3'],
 });

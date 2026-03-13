@@ -1,11 +1,11 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { exec } from 'node:child_process';
 import { initCommand } from './init.js';
 import { runCommand } from './run.js';
 import { e2eCommand } from './e2e.js';
 import { statusCommand } from './status.js';
 import { dashboardCommand } from './dashboard.js';
-import { interactiveMenu } from './menu.js';
 
 export const program = new Command()
   .name('ralphflow')
@@ -17,7 +17,15 @@ export const program = new Command()
   .addCommand(statusCommand)
   .addCommand(dashboardCommand)
   .action(async () => {
-    await interactiveMenu(process.cwd());
+    const port = 4242;
+    const { startDashboard } = await import('../dashboard/server.js');
+    await startDashboard({ cwd: process.cwd(), port });
+    const url = `http://localhost:${port}`;
+    exec(`open "${url}"`, (err) => {
+      if (err) {
+        console.log(chalk.dim(`  Open ${url} in your browser`));
+      }
+    });
   });
 
 // Graceful Ctrl+C handling at the top level
