@@ -322,6 +322,74 @@
     color: var(--green);
   }
 
+  /* Three-panel layout */
+  .panel-grid {
+    display: grid;
+    grid-template-columns: 40fr 60fr;
+    gap: 16px;
+    min-height: 0;
+  }
+  .panel-col-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+  }
+  .panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .panel-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+  .panel-interactive {
+    flex-shrink: 0;
+  }
+  .panel-interactive .panel-body {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .panel-interactive .bell-icon {
+    font-size: 14px;
+    opacity: 0.5;
+  }
+  .panel-progress {
+    flex: 1;
+    min-height: 0;
+  }
+  .panel-edit {
+    min-height: 0;
+    max-height: calc(100vh - 200px);
+  }
+  .panel-edit .panel-body {
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-edit .editor {
+    flex: 1;
+    min-height: 200px;
+  }
+
   /* Tracker viewer */
   .tracker-viewer {
     background: var(--bg-surface);
@@ -335,6 +403,13 @@
     overflow-y: auto;
     white-space: pre-wrap;
     word-wrap: break-word;
+  }
+  .panel-progress .tracker-viewer {
+    border: none;
+    border-radius: 0;
+    max-height: none;
+    padding: 0;
+    margin-top: 16px;
   }
   .tracker-viewer h1, .tracker-viewer h2, .tracker-viewer h3 {
     font-family: var(--sans);
@@ -781,25 +856,42 @@
     });
     html += '</div></div>';
 
-    // Loop detail
+    // Loop detail — two-column three-panel layout
     if (currentLoop) {
       const st = currentLoop.status || {};
-      html += `<div class="section">
-        <div class="section-title">Loop Detail: ${esc(currentLoop.name)}</div>
-        <div class="loop-meta">
-          <div class="meta-card"><div class="meta-label">Stage</div><div class="meta-value">${esc(st.stage || '—')}</div></div>
-          <div class="meta-card"><div class="meta-label">Active</div><div class="meta-value">${esc(st.active || 'none')}</div></div>
-          <div class="meta-card">
-            <div class="meta-label">Progress</div>
-            <div class="meta-value">${st.completed || 0}/${st.total || 0}</div>
-            <div class="progress-bar"><div class="progress-fill" style="width:${st.total ? (st.completed / st.total * 100) : 0}%"></div></div>
-          </div>
-          <div class="meta-card"><div class="meta-label">Stages</div><div class="meta-value" style="font-size:11px">${(currentLoop.stages || []).join(' → ')}</div></div>
-        </div>`;
+
+      html += '<div class="panel-grid">';
+
+      // Left column: Interactive + Progress
+      html += '<div class="panel-col-left">';
+
+      // Interactive panel
+      html += `<div class="panel panel-interactive">
+        <div class="panel-header">Interactive</div>
+        <div class="panel-body">
+          <span class="bell-icon">&#128276;</span>
+          <span>No notifications</span>
+        </div>
+      </div>`;
+
+      // Progress panel
+      html += `<div class="panel panel-progress">
+        <div class="panel-header">Progress</div>
+        <div class="panel-body">
+          <div class="loop-meta">
+            <div class="meta-card"><div class="meta-label">Stage</div><div class="meta-value">${esc(st.stage || '—')}</div></div>
+            <div class="meta-card"><div class="meta-label">Active</div><div class="meta-value">${esc(st.active || 'none')}</div></div>
+            <div class="meta-card">
+              <div class="meta-label">Progress</div>
+              <div class="meta-value">${st.completed || 0}/${st.total || 0}</div>
+              <div class="progress-bar"><div class="progress-fill" style="width:${st.total ? (st.completed / st.total * 100) : 0}%"></div></div>
+            </div>
+            <div class="meta-card"><div class="meta-label">Stages</div><div class="meta-value" style="font-size:11px">${(currentLoop.stages || []).join(' → ')}</div></div>
+          </div>`;
 
       // Agent table
       if (st.agents && st.agents.length > 0) {
-        html += `<div style="margin-bottom:16px">
+        html += `<div style="margin-top:16px">
           <table class="agent-table">
             <thead><tr><th>Agent</th><th>Active Task</th><th>Stage</th><th>Heartbeat</th></tr></thead>
             <tbody>`;
@@ -809,27 +901,29 @@
         html += '</tbody></table></div>';
       }
 
-      html += '</div>';
+      // Tracker viewer (inside Progress panel)
+      html += `<div class="tracker-viewer" id="trackerViewer">Loading...</div>`;
 
-      // Prompt editor
-      html += `<div class="section">
-        <div class="section-title">Prompt Editor</div>
-        <div class="editor-wrap">
-          <textarea class="editor" id="promptEditor" placeholder="Loading..."></textarea>
-          <div class="editor-actions">
-            <button class="btn btn-primary" id="savePromptBtn" disabled>Save</button>
-            <button class="btn" id="resetPromptBtn" disabled>Reset</button>
-            <span class="dirty-indicator" id="dirtyIndicator" style="display:none">Unsaved changes</span>
-            <span class="save-ok" id="saveOk" style="display:none">Saved</span>
+      html += '</div></div>'; // close .panel-body + .panel-progress
+      html += '</div>'; // close .panel-col-left
+
+      // Right column: Edit panel
+      html += `<div class="panel panel-edit">
+        <div class="panel-header">Edit</div>
+        <div class="panel-body">
+          <div class="editor-wrap">
+            <textarea class="editor" id="promptEditor" placeholder="Loading..."></textarea>
+            <div class="editor-actions">
+              <button class="btn btn-primary" id="savePromptBtn" disabled>Save</button>
+              <button class="btn" id="resetPromptBtn" disabled>Reset</button>
+              <span class="dirty-indicator" id="dirtyIndicator" style="display:none">Unsaved changes</span>
+              <span class="save-ok" id="saveOk" style="display:none">Saved</span>
+            </div>
           </div>
         </div>
       </div>`;
 
-      // Tracker viewer
-      html += `<div class="section">
-        <div class="section-title">Tracker (live, read-only)</div>
-        <div class="tracker-viewer" id="trackerViewer">Loading...</div>
-      </div>`;
+      html += '</div>'; // close .panel-grid
     }
 
     content.innerHTML = html;
