@@ -26,7 +26,7 @@ src/
 │   └── template.ts           — Template path resolution (dev vs bundled), file copying, variable substitution
 ├── dashboard/
 │   ├── server.ts             — Hono HTTP + WebSocket server on 127.0.0.1:4242
-│   ├── api.ts                — REST endpoints: /api/apps, status, config, db, prompt CRUD, tracker, files
+│   ├── api.ts                — REST endpoints: /api/apps, status, config, db, prompt CRUD, tracker, files, archives
 │   ├── hooks.ts              — Claude Code Notification hook management for .claude/settings.local.json
 │   ├── watcher.ts            — Chokidar file watcher → WebSocket broadcast, DB polling every 2s
 │   └── ui/index.html         — Single-file vanilla JS frontend (dark theme, no build step)
@@ -134,6 +134,9 @@ The runner sets `RALPHFLOW_APP` (flow directory basename, e.g. `code-implementat
 
 ### App Archiving (dashboard/api.ts)
 `POST /api/apps/:app/archive` snapshots the full app directory to `.ralph-flow/.archives/<appName>/<YYYY-MM-DD_HH-mm>/`, then resets the app in place: tracker files revert to template state, data files (stories.md, tasks.md) reset to headers only, `.agents/` dirs and lock files are cleaned up, and SQLite `loop_state` rows are deleted. Prompt files and `ralphflow.yaml` are preserved. Uses `resolveTemplatePath(config.name)` to find template originals for reset. Same-minute collisions append a sequence suffix (e.g., `2026-03-14_15-30-2`). The `.archives/` directory is dotfile-prefixed so `listFlows()` ignores it.
+
+### Archive Browsing API (dashboard/api.ts)
+Three endpoints for browsing archived snapshots: `GET /api/apps/:app/archives` lists all archives sorted newest-first, each with `timestamp`, `summary` ({storyCount, taskCount} parsed from markdown headers), and `fileCount`. `GET /api/apps/:app/archives/:timestamp/files` returns a recursive file listing within a specific archive. `GET /api/apps/:app/archives/:timestamp/files/*` reads a specific file's content. All endpoints validate paths against directory traversal. Returns empty array (not error) when no archives exist.
 
 ### Dashboard Notification UI (ui/index.html)
 The Interactive panel (left column, top) renders per-loop attention notifications. Notifications are stored in `notificationsList` (client-side array hydrated from `GET /api/notifications` on load). Each card shows timestamp, message, and dismiss (X) button. Sidebar loop items display a `.notif-badge` count for undismissed notifications. Browser `Notification` API permission is requested on first notification; desktop toasts fire when the tab is in the background. An audible two-note chime (Web Audio API, ~250ms) plays on each notification — AudioContext is lazily initialized on first user interaction to satisfy browser autoplay policies.
