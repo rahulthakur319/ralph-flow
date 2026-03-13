@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync, rmSync, cpSync, m
 import { join, resolve, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { listFlows, resolveFlowDir, loadConfig } from '../core/config.js';
 import { parseTracker } from '../core/status.js';
 import { getDb, getAllLoopStates, deleteFlowState } from '../core/db.js';
@@ -65,6 +66,8 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
           name: loop.name,
           order: loop.order,
           stages: loop.stages,
+          multiAgent: !!(loop.multi_agent && typeof loop.multi_agent === 'object' && loop.multi_agent.enabled),
+          model: loop.model || null,
         })),
       };
     });
@@ -293,6 +296,40 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
     const configPath = join(flowDir, 'ralphflow.yaml');
     const rawYaml = existsSync(configPath) ? readFileSync(configPath, 'utf-8') : '';
     return c.json({ ...config, _rawYaml: rawYaml });
+  });
+
+  // PUT /api/apps/:app/config/model — update a loop's model in ralphflow.yaml
+  api.put('/api/apps/:app/config/model', async (c) => {
+    const appName = c.req.param('app');
+    const flowDir = resolveFlowDir(cwd, appName);
+    const configPath = join(flowDir, 'ralphflow.yaml');
+
+    if (!existsSync(configPath)) {
+      return c.json({ error: 'ralphflow.yaml not found' }, 404);
+    }
+
+    const body = await c.req.json<{ loop: string; model: string | null }>();
+    const { loop: loopKey, model } = body;
+
+    if (!loopKey) {
+      return c.json({ error: 'loop is required' }, 400);
+    }
+
+    const rawYaml = readFileSync(configPath, 'utf-8');
+    const config = parseYaml(rawYaml) as RalphFlowConfig;
+
+    if (!config.loops || !config.loops[loopKey]) {
+      return c.json({ error: `Loop "${loopKey}" not found in config` }, 404);
+    }
+
+    if (model === null || model === '') {
+      delete config.loops[loopKey].model;
+    } else {
+      config.loops[loopKey].model = model;
+    }
+
+    writeFileSync(configPath, stringifyYaml(config, { lineWidth: 0 }), 'utf-8');
+    return c.json({ ok: true, loop: loopKey, model: model || null });
   });
 
   // GET /api/apps/:app/db — SQLite loop_state rows

@@ -1114,6 +1114,25 @@
     });
     html += '</div></div>';
 
+    // Commands section
+    html += '<div class="section"><div class="section-title">Commands</div><div class="commands-list">';
+    app.loops.forEach(loop => {
+      const alias = loop.key.replace(/-loop$/, '');
+      let cmd = `npx ralphflow run ${alias} -f ${app.appName}`;
+      if (loop.multiAgent) cmd += ' --multi-agent';
+      if (loop.model) cmd += ` --model ${loop.model}`;
+      html += `<div class="cmd-item">
+        <span class="cmd-text">${esc(cmd)}</span>
+        <button class="cmd-copy" data-cmd="${esc(cmd)}">Copy</button>
+      </div>`;
+    });
+    const e2eCmd = `npx ralphflow e2e -f ${app.appName}`;
+    html += `<div class="cmd-item">
+      <span class="cmd-text">${esc(e2eCmd)}</span>
+      <button class="cmd-copy" data-cmd="${esc(e2eCmd)}">Copy</button>
+    </div>`;
+    html += '</div></div>';
+
     // Loop detail — two-column three-panel layout
     if (currentLoop) {
       const st = currentLoop.status || {};
@@ -1195,6 +1214,18 @@
     // Bind pipeline node clicks
     content.querySelectorAll('.pipeline-node').forEach(el => {
       el.addEventListener('click', () => selectLoop(el.dataset.loop));
+    });
+
+    // Bind command copy buttons
+    content.querySelectorAll('.commands-list .cmd-copy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cmd = btn.dataset.cmd || '';
+        navigator.clipboard.writeText(cmd).then(() => {
+          const orig = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => { btn.textContent = orig; }, 1500);
+        });
+      });
     });
 
     // Bind notification dismiss buttons
