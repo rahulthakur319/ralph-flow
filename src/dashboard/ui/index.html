@@ -431,6 +431,14 @@
 
   hostDisplay.textContent = location.host;
 
+  // Fetch project context for header display
+  fetch('/api/context')
+    .then(r => r.json())
+    .then(ctx => {
+      hostDisplay.textContent = ctx.projectName + ' :' + ctx.port;
+    })
+    .catch(() => { /* keep location.host as fallback */ });
+
   // WebSocket
   function connectWs() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
