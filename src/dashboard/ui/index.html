@@ -312,6 +312,12 @@
     border-color: var(--accent);
   }
   .btn-primary:hover { background: #79c0ff; }
+  .btn-danger {
+    background: transparent;
+    color: var(--red);
+    border-color: var(--red);
+  }
+  .btn-danger:hover { background: rgba(248, 81, 73, 0.15); }
   .btn:disabled { opacity: 0.5; cursor: default; }
   .dirty-indicator {
     font-size: 11px;
@@ -387,7 +393,7 @@
   }
   .panel-edit .editor {
     flex: 1;
-    min-height: 200px;
+    min-height: 60vh;
   }
 
   /* Edit tabs */
@@ -413,6 +419,119 @@
     color: var(--text);
     border-bottom-color: var(--accent);
   }
+
+  /* Prompt mode toggle */
+  .prompt-mode-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    width: fit-content;
+  }
+  .prompt-mode-btn {
+    padding: 6px 16px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    background: var(--bg);
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .prompt-mode-btn:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+  .prompt-mode-btn:hover { color: var(--text); background: var(--bg-hover); }
+  .prompt-mode-btn.active {
+    color: var(--text);
+    background: var(--bg-active);
+  }
+
+  /* Markdown preview */
+  .prompt-preview {
+    flex: 1;
+    min-height: 60vh;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 24px 28px;
+    overflow: auto;
+  }
+  .prompt-preview h1 { font-size: 22px; font-weight: 600; margin: 24px 0 12px; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .prompt-preview h1:first-child { margin-top: 0; }
+  .prompt-preview h2 { font-size: 18px; font-weight: 600; margin: 20px 0 10px; color: var(--text); }
+  .prompt-preview h3 { font-size: 15px; font-weight: 600; margin: 16px 0 8px; color: var(--text); }
+  .prompt-preview h4 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+  .prompt-preview p { margin: 0 0 12px; }
+  .prompt-preview ul, .prompt-preview ol { margin: 0 0 12px; padding-left: 24px; }
+  .prompt-preview li { margin: 4px 0; }
+  .prompt-preview li.task-done { color: var(--text-dim); text-decoration: line-through; }
+  .prompt-preview code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+  }
+  .prompt-preview pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin: 0 0 12px;
+    overflow-x: auto;
+  }
+  .prompt-preview pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .prompt-preview blockquote {
+    border-left: 3px solid var(--accent);
+    padding: 4px 16px;
+    margin: 0 0 12px;
+    color: var(--text-dim);
+    background: var(--bg);
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .prompt-preview hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 16px 0;
+  }
+  .prompt-preview strong { font-weight: 600; color: var(--text); }
+  .prompt-preview em { font-style: italic; }
+  .prompt-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 0 12px;
+    font-size: 13px;
+  }
+  .prompt-preview th, .prompt-preview td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .prompt-preview th {
+    background: var(--bg);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--text-dim);
+  }
+  .prompt-preview a { color: var(--accent); text-decoration: none; }
+  .prompt-preview a:hover { text-decoration: underline; }
 
   /* Read-only code viewer */
   .code-viewer {
@@ -754,9 +873,12 @@
   let ws = null;
   let reconnectDelay = 1000;
   let activeEditTab = 'prompt';
+  let promptViewMode = 'read';
   let cachedPromptValue = null;
   let notificationsList = [];
   let notifPermissionRequested = false;
+  let audioCtx = null;
+  let audioCtxInitialized = false;
 
   // DOM refs
   const $ = (sel) => document.querySelector(sel);
@@ -845,6 +967,7 @@
       renderContent();
       maybeRequestNotifPermission();
       showBrowserNotification(n);
+      playNotificationChime();
     } else if (event.type === 'notification:dismissed') {
       notificationsList = notificationsList.filter(n => n.id !== event.id);
       renderSidebar();
@@ -930,6 +1053,7 @@
     promptDirty = false;
     activeEditTab = 'prompt';
     cachedPromptValue = null;
+    document.title = app.appName + ' - RalphFlow Dashboard';
     renderSidebar();
     renderContent();
     fetchAppStatus(app.appName);
@@ -958,8 +1082,13 @@
 
     // App header
     html += `<div class="app-header">
-      <h2>${esc(app.appName)}</h2>
-      <span class="app-type-badge">${esc(app.appType)}</span>
+      <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;width:100%">
+        <div style="display:flex;align-items:center;gap:10px">
+          <h2>${esc(app.appName)}</h2>
+          <span class="app-type-badge">${esc(app.appType)}</span>
+        </div>
+        <button class="btn btn-danger" style="font-size:12px;padding:4px 10px" onclick="openDeleteAppModal('${esc(app.appName)}')">Delete</button>
+      </div>
       ${app.description ? `<div class="app-desc">${esc(app.description)}</div>` : ''}
     </div>`;
 
@@ -1116,6 +1245,18 @@
     bindPromptEditor(appName, loopKey);
   }
 
+  async function loadPromptPreview(appName, loopKey) {
+    const preview = $('#promptPreview');
+    if (!preview) return;
+    try {
+      const data = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/loops/${encodeURIComponent(loopKey)}/prompt`);
+      promptOriginal = data.content || '';
+      preview.innerHTML = renderMarkdown(promptOriginal);
+    } catch {
+      preview.innerHTML = '<p style="color:var(--text-dim)">(Error loading prompt)</p>';
+    }
+  }
+
   async function savePrompt(appName, loopKey) {
     const editor = $('#promptEditor');
     if (!editor || !promptDirty) return;
@@ -1175,30 +1316,124 @@
     renderEditTabContent(appName, loopKey);
   }
 
+  function renderMarkdown(md) {
+    if (!md) return '<p style="color:var(--text-dim)">(empty)</p>';
+    let html = md;
+    // Escape HTML
+    html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Fenced code blocks
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) =>
+      '<pre><code>' + code.trimEnd() + '</code></pre>'
+    );
+    // Tables
+    html = html.replace(/((?:^\|.+\|$\n?)+)/gm, (block) => {
+      const rows = block.trim().split('\n').filter(r => r.trim());
+      if (rows.length < 2) return block;
+      const parseRow = r => r.split('|').slice(1, -1).map(c => c.trim());
+      const headers = parseRow(rows[0]);
+      // Skip separator row
+      const isSep = rows[1] && /^\|[\s:|-]+\|$/.test(rows[1].trim());
+      const dataRows = rows.slice(isSep ? 2 : 1);
+      let t = '<table><thead><tr>' + headers.map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>';
+      for (const row of dataRows) {
+        const cells = parseRow(row);
+        t += '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>';
+      }
+      t += '</tbody></table>';
+      return t;
+    });
+    // Blockquotes
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+    // Horizontal rules
+    html = html.replace(/^---+$/gm, '<hr>');
+    // Headings
+    html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    // Task list items
+    html = html.replace(/^- \[x\] (.+)$/gm, '<li class="task-done">&#9745; $1</li>');
+    html = html.replace(/^- \[ \] (.+)$/gm, '<li>&#9744; $1</li>');
+    // Unordered list items
+    html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+    // Ordered list items
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+    // Wrap consecutive <li> in <ul>
+    html = html.replace(/((?:<li[^>]*>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+    // Inline code (but not inside <pre>)
+    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    // Bold and italic
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    // Mustache/template vars — highlight them
+    html = html.replace(/\{\{(\w+)\}\}/g, '<code style="color:var(--purple)">{{$1}}</code>');
+    // Paragraphs: wrap remaining plain text lines
+    html = html.replace(/^(?!<[a-z/])((?!$).+)$/gm, '<p>$1</p>');
+    // Clean up double-wrapped
+    html = html.replace(/<p><(h[1-4]|ul|ol|li|blockquote|pre|table|hr)/g, '<$1');
+    html = html.replace(/<\/(h[1-4]|ul|ol|li|blockquote|pre|table)><\/p>/g, '</$1>');
+    return html;
+  }
+
   function renderEditTabContent(appName, loopKey) {
     const container = $('#editTabContent');
     if (!container) return;
 
     if (activeEditTab === 'prompt') {
-      container.innerHTML = `<div class="editor-wrap">
-        <textarea class="editor" id="promptEditor" placeholder="Loading..."></textarea>
-        <div class="editor-actions">
-          <button class="btn btn-primary" id="savePromptBtn" disabled>Save</button>
-          <button class="btn" id="resetPromptBtn" disabled>Reset</button>
-          <span class="dirty-indicator" id="dirtyIndicator" style="display:none">Unsaved changes</span>
-          <span class="save-ok" id="saveOk" style="display:none">Saved</span>
+      const isRead = promptViewMode === 'read';
+      const isEdit = promptViewMode === 'edit';
+      container.innerHTML = `
+        <div class="prompt-mode-toggle">
+          <button class="prompt-mode-btn${isRead ? ' active' : ''}" data-mode="read">Read</button>
+          <button class="prompt-mode-btn${isEdit ? ' active' : ''}" data-mode="edit">Edit</button>
         </div>
-      </div>`;
-      if (cachedPromptValue !== null) {
-        const editor = $('#promptEditor');
-        if (editor) {
-          editor.value = cachedPromptValue;
-          updateDirtyState();
-          bindPromptEditor(appName, loopKey);
+        ${isEdit ? `<div class="editor-wrap">
+          <textarea class="editor" id="promptEditor" placeholder="Loading..."></textarea>
+          <div class="editor-actions">
+            <button class="btn btn-primary" id="savePromptBtn" disabled>Save</button>
+            <button class="btn" id="resetPromptBtn" disabled>Reset</button>
+            <span class="dirty-indicator" id="dirtyIndicator" style="display:none">Unsaved changes</span>
+            <span class="save-ok" id="saveOk" style="display:none">Saved</span>
+          </div>
+        </div>` : `<div class="prompt-preview" id="promptPreview">Loading...</div>`}`;
+      // Bind toggle buttons
+      container.querySelectorAll('.prompt-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (btn.dataset.mode === promptViewMode) return;
+          // Cache editor value before switching away from edit
+          if (promptViewMode === 'edit') {
+            const editor = $('#promptEditor');
+            if (editor) cachedPromptValue = editor.value;
+          }
+          promptViewMode = btn.dataset.mode;
+          renderEditTabContent(appName, loopKey);
+        });
+      });
+      if (isEdit) {
+        if (cachedPromptValue !== null) {
+          const editor = $('#promptEditor');
+          if (editor) {
+            editor.value = cachedPromptValue;
+            updateDirtyState();
+            bindPromptEditor(appName, loopKey);
+          }
+          cachedPromptValue = null;
+        } else {
+          loadPrompt(appName, loopKey);
         }
-        cachedPromptValue = null;
       } else {
-        loadPrompt(appName, loopKey);
+        // Read mode — render markdown preview
+        if (cachedPromptValue !== null || promptOriginal) {
+          const content = cachedPromptValue !== null ? cachedPromptValue : promptOriginal;
+          const preview = $('#promptPreview');
+          if (preview) preview.innerHTML = renderMarkdown(content);
+        } else {
+          // Need to fetch
+          loadPromptPreview(appName, loopKey);
+        }
       }
     } else if (activeEditTab === 'tracker') {
       container.innerHTML = '<pre class="code-viewer" id="editTrackerViewer">Loading...</pre>';
@@ -1352,6 +1587,140 @@
     if (document.hasFocus()) return;
     const msg = extractNotifMessage(n.payload);
     new Notification('RalphFlow — ' + (n.loop || 'Notification'), { body: msg });
+  }
+
+  // Audio notification chime (Web Audio API)
+  function initAudioContext() {
+    if (audioCtxInitialized) return;
+    audioCtxInitialized = true;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      // Silent fail — audio is best-effort
+    }
+  }
+
+  function playNotificationChime() {
+    if (!audioCtx) return;
+    try {
+      const now = audioCtx.currentTime;
+      // First tone: E5 (659 Hz), 120ms
+      const osc1 = audioCtx.createOscillator();
+      const gain1 = audioCtx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.value = 659;
+      gain1.gain.setValueAtTime(0.15, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc1.connect(gain1);
+      gain1.connect(audioCtx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.12);
+      // Second tone: A5 (880 Hz), 150ms, starts 80ms after first
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.value = 880;
+      gain2.gain.setValueAtTime(0, now + 0.08);
+      gain2.gain.linearRampToValueAtTime(0.12, now + 0.1);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.start(now + 0.08);
+      osc2.stop(now + 0.25);
+    } catch (e) {
+      // Silent fail
+    }
+  }
+
+  // Initialize audio context on first user interaction (autoplay policy)
+  function onFirstInteraction() {
+    initAudioContext();
+    document.removeEventListener('click', onFirstInteraction);
+    document.removeEventListener('keydown', onFirstInteraction);
+  }
+  document.addEventListener('click', onFirstInteraction);
+  document.addEventListener('keydown', onFirstInteraction);
+
+  // Delete App Modal — exposed globally for inline onclick handlers
+  window.openDeleteAppModal = openDeleteAppModal;
+  function openDeleteAppModal(appName) {
+    const existing = document.querySelector('.modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Delete App</h3>
+          <button class="modal-close" data-action="close">&times;</button>
+        </div>
+        <div class="modal-body" id="deleteModalBody">
+          <p style="margin-bottom:12px">Are you sure you want to delete <strong>${esc(appName)}</strong>?</p>
+          <p style="color:var(--red);font-size:13px">This will permanently remove the app directory and all associated data. This action cannot be undone.</p>
+          <div id="deleteModalMessage"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-action="close">Cancel</button>
+          <button class="btn btn-danger" id="deleteModalBtn">Delete</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.dataset.action === 'close') {
+        overlay.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    });
+
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        overlay.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.querySelector('#deleteModalBtn').addEventListener('click', () => submitDeleteApp(overlay, appName));
+  }
+
+  async function submitDeleteApp(overlay, appName) {
+    const msgEl = overlay.querySelector('#deleteModalMessage');
+    const deleteBtn = overlay.querySelector('#deleteModalBtn');
+
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = 'Deleting...';
+    msgEl.innerHTML = '';
+
+    try {
+      const res = await fetch('/api/apps/' + encodeURIComponent(appName), { method: 'DELETE' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        msgEl.innerHTML = `<div class="form-error">${esc(data.error || 'Failed to delete app')}</div>`;
+        deleteBtn.disabled = false;
+        deleteBtn.textContent = 'Delete';
+        return;
+      }
+
+      overlay.remove();
+
+      // Clean up client state
+      notificationsList = notificationsList.filter(n => n.app !== appName);
+      if (selectedApp && selectedApp.appName === appName) {
+        selectedApp = null;
+        selectedLoop = null;
+        document.title = 'RalphFlow Dashboard';
+      }
+      fetchApps();
+    } catch (err) {
+      msgEl.innerHTML = '<div class="form-error">Network error — could not reach server</div>';
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = 'Delete';
+    }
   }
 
   // Create App Modal
