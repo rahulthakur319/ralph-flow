@@ -46,7 +46,7 @@ function writeSettings(cwd: string, settings: SettingsLocal): void {
 }
 
 function buildHookCommand(port: number): string {
-  return `cat | curl --connect-timeout 2 --max-time 5 -s -X POST http://127.0.0.1:${port}/api/notification -H 'Content-Type: application/json' -d @- ${RALPHFLOW_MARKER}`;
+  return `cat | curl --connect-timeout 2 --max-time 5 -s -X POST "http://127.0.0.1:${port}/api/notification?app=\$RALPHFLOW_APP&loop=\$RALPHFLOW_LOOP" -H 'Content-Type: application/json' -d @- ${RALPHFLOW_MARKER}`;
 }
 
 function isRalphFlowHook(entry: HookEntry): boolean {

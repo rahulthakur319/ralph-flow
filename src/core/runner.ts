@@ -59,6 +59,11 @@ function releaseAgentId(dir: string, agentName: string): void {
   try { unlinkSync(lockFile); } catch { /* already gone */ }
 }
 
+function isMultiAgentLoop(loop: LoopConfig): boolean {
+  return loop.multi_agent !== false &&
+    (loop.multi_agent as MultiAgentConfig).enabled === true;
+}
+
 // ---------------------------------------------------------------------------
 // Completion detection — check tracker file for <promise>...</promise>
 // ---------------------------------------------------------------------------
@@ -82,6 +87,11 @@ function checkTrackerMetadataCompletion(flowDir: string, loop: LoopConfig): bool
   const trackerPath = join(flowDir, loop.tracker);
   if (!existsSync(trackerPath)) return false;
   const content = readFileSync(trackerPath, 'utf-8');
+
+  // If there are unchecked checkboxes, the loop is NOT complete —
+  // metadata alone cannot override visible incomplete work
+  const unchecked = (content.match(/- \[ \]/g) || []).length;
+  if (unchecked > 0) return false;
 
   // Check if all items in the queue are marked completed via metadata
   const completedMatch = content.match(/^- completed_(?:tasks|stories): \[(.+)\]$/m);
@@ -129,7 +139,7 @@ export async function runLoop(loopName: string, options: RunOptions): Promise<vo
   let agentName: string | undefined;
   let agentDir: string | undefined;
 
-  if (options.multiAgent) {
+  if (options.multiAgent || isMultiAgentLoop(loop)) {
     if (loop.multi_agent === false) {
       throw new Error(`Loop "${loop.name}" does not support multi-agent mode.`);
     }
@@ -156,13 +166,14 @@ export async function runLoop(loopName: string, options: RunOptions): Promise<vo
   process.on('SIGTERM', () => { cleanup(); process.exit(143); });
 
   try {
-    await iterationLoop(loop, flowDir, options, agentName);
+    await iterationLoop(key, loop, flowDir, options, agentName);
   } finally {
     cleanup();
   }
 }
 
 async function iterationLoop(
+  configKey: string,
   loop: LoopConfig,
   flowDir: string,
   options: RunOptions,
@@ -171,6 +182,7 @@ async function iterationLoop(
   flowName?: string,
 ): Promise<void> {
   const loopKey = loop.name;
+  const appName = basename(flowDir);
 
   for (let i = 1; i <= options.maxIterations; i++) {
     // Pre-flight: check DB first, then tracker
@@ -194,6 +206,10 @@ async function iterationLoop(
       prompt,
       model: options.model,
       cwd: options.cwd,
+      env: {
+        RALPHFLOW_APP: appName,
+        RALPHFLOW_LOOP: configKey,
+      },
     });
 
     // After Claude returns: update DB iteration count
@@ -244,7 +260,20 @@ export async function runAllLoops(options: RunOptions): Promise<void> {
 
   for (const [key, loop] of sortedLoops) {
     console.log(chalk.bold(`  Starting: ${loop.name}`));
-    await iterationLoop(loop, flowDir, options);
+
+    let agentName: string | undefined;
+    let agentDir: string | undefined;
+
+    if (isMultiAgentLoop(loop)) {
+      agentDir = agentsDir(flowDir, loop);
+      agentName = acquireAgentId(agentDir, (loop.multi_agent as MultiAgentConfig).max_agents);
+    }
+
+    try {
+      await iterationLoop(key, loop, flowDir, options, agentName);
+    } finally {
+      if (agentDir && agentName) releaseAgentId(agentDir, agentName);
+    }
   }
 
   console.log(chalk.green('  All loops complete.'));
@@ -283,7 +312,20 @@ export async function runE2E(options: RunOptions): Promise<void> {
 
     markLoopRunning(db, flowName, loopKey);
     console.log(chalk.bold(`  \u2192 ${loop.name}`));
-    await iterationLoop(loop, flowDir, options, undefined, db, flowName);
+
+    let agentName: string | undefined;
+    let agentDir: string | undefined;
+
+    if (isMultiAgentLoop(loop)) {
+      agentDir = agentsDir(flowDir, loop);
+      agentName = acquireAgentId(agentDir, (loop.multi_agent as MultiAgentConfig).max_agents);
+    }
+
+    try {
+      await iterationLoop(key, loop, flowDir, options, agentName, db, flowName);
+    } finally {
+      if (agentDir && agentName) releaseAgentId(agentDir, agentName);
+    }
 
     // Summary after loop
     if (isLoopComplete(db, flowName, loopKey)) {

@@ -5,6 +5,7 @@ export interface SpawnClaudeOptions {
   prompt: string;
   model?: string;
   cwd: string;
+  env?: Record<string, string>;
 }
 
 /**
@@ -14,7 +15,7 @@ export interface SpawnClaudeOptions {
  * (stdin/stdout/stderr) so Claude Code runs exactly as if the user typed it.
  */
 export async function spawnClaude(options: SpawnClaudeOptions): Promise<ClaudeResult> {
-  const { prompt, model, cwd } = options;
+  const { prompt, model, cwd, env: extraEnv } = options;
 
   const args: string[] = ['--dangerously-skip-permissions', prompt];
 
@@ -27,7 +28,7 @@ export async function spawnClaude(options: SpawnClaudeOptions): Promise<ClaudeRe
     const child = spawn('claude', args, {
       cwd,
       stdio: 'inherit',
-      env: { ...process.env },
+      env: { ...process.env, ...extraEnv },
     });
 
     child.on('error', (err) => {
