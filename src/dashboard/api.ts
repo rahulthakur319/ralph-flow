@@ -557,3 +557,64 @@ function validatePath(resolvedPath: string, cwd: string): boolean {
   const ralphFlowDir = resolve(cwd, '.ralph-flow');
   return resolvedPath.startsWith(ralphFlowDir) && !resolvedPath.includes('..');
 }
+
+/**
+ * Parse summary stats from an archived app directory.
+ * Counts STORY-{N} and TASK-{N} headers in data files.
+ */
+function parseArchiveSummary(archiveDir: string): { storyCount: number; taskCount: number } {
+  let storyCount = 0;
+  let taskCount = 0;
+
+  // Walk all .md files looking for story and task headers
+  const mdFiles = listFilesRecursive(archiveDir, archiveDir)
+    .filter(f => f.path.endsWith('.md'));
+
+  for (const file of mdFiles) {
+    try {
+      const content = readFileSync(join(archiveDir, file.path), 'utf-8');
+      const storyMatches = content.match(/^## STORY-\d+:/gm);
+      if (storyMatches) storyCount += storyMatches.length;
+      const taskMatches = content.match(/^## TASK-\d+:/gm);
+      if (taskMatches) taskCount += taskMatches.length;
+    } catch {
+      // Skip unreadable files
+    }
+  }
+
+  return { storyCount, taskCount };
+}
+
+/**
+ * Count all files (not directories) recursively in a directory.
+ */
+function countFiles(dir: string): number {
+  let count = 0;
+  const entries = readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      count += countFiles(join(dir, entry.name));
+    } else {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * List all files recursively in a directory, returning paths relative to baseDir.
+ */
+function listFilesRecursive(dir: string, baseDir: string): { path: string; isDirectory: false }[] {
+  const results: { path: string; isDirectory: false }[] = [];
+  const entries = readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    const relPath = relative(baseDir, fullPath);
+    if (entry.isDirectory()) {
+      results.push(...listFilesRecursive(fullPath, baseDir));
+    } else {
+      results.push({ path: relPath, isDirectory: false });
+    }
+  }
+  return results;
+}
