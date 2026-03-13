@@ -240,7 +240,8 @@ export function createCustomTemplate(cwd: string, definition: TemplateDefinition
 
   // Generate loop configs
   definition.loops.forEach((loopDef, index) => {
-    const loopKey = loopDef.name.toLowerCase().replace(/\s+/g, '-');
+    const baseKey = loopDef.name.toLowerCase().replace(/\s+/g, '-');
+    const loopKey = baseKey.endsWith('-loop') ? baseKey : `${baseKey}-loop`;
     const dirPrefix = String(index).padStart(2, '0');
     const loopDirName = `${dirPrefix}-${loopKey}`;
 
@@ -293,7 +294,8 @@ export function createCustomTemplate(cwd: string, definition: TemplateDefinition
 
   // Scaffold loop directories
   definition.loops.forEach((loopDef, index) => {
-    const loopKey = loopDef.name.toLowerCase().replace(/\s+/g, '-');
+    const baseKey = loopDef.name.toLowerCase().replace(/\s+/g, '-');
+    const loopKey = baseKey.endsWith('-loop') ? baseKey : `${baseKey}-loop`;
     const dirPrefix = String(index).padStart(2, '0');
     const loopDirName = `${dirPrefix}-${loopKey}`;
     const loopDir = join(loopsDir, loopDirName);

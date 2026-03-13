@@ -23,10 +23,10 @@ src/
 │   ├── db.ts                 — SQLite (better-sqlite3, WAL mode): loop_state table, status tracking
 │   ├── status.ts             — parseTracker(): regex-based tracker.md parsing (stage, checkboxes, agents)
 │   ├── init.ts               — initProject(): scaffold .ralph-flow/<name>/ from template
-│   └── template.ts           — Template path resolution (dev vs bundled), file copying, variable substitution
+│   └── template.ts           — Template path resolution (dev vs bundled), file copying, custom template CRUD
 ├── dashboard/
 │   ├── server.ts             — Hono HTTP + WebSocket server on 127.0.0.1:4242
-│   ├── api.ts                — REST endpoints: /api/apps, status, config, db, prompt CRUD, tracker, files, archives
+│   ├── api.ts                — REST endpoints: /api/apps, status, config, db, prompt CRUD, tracker, files, archives, templates
 │   ├── hooks.ts              — Claude Code Notification hook management for .claude/settings.local.json
 │   ├── watcher.ts            — Chokidar file watcher → WebSocket broadcast, DB polling every 2s
 │   └── ui/index.html         — Single-file vanilla JS frontend (dark theme, no build step)
@@ -137,6 +137,9 @@ The runner sets `RALPHFLOW_APP` (flow directory basename, e.g. `code-implementat
 
 ### Archive Browsing API (dashboard/api.ts)
 Three endpoints for browsing archived snapshots: `GET /api/apps/:app/archives` lists all archives sorted newest-first, each with `timestamp`, `summary` ({storyCount, taskCount} parsed from markdown headers), and `fileCount`. `GET /api/apps/:app/archives/:timestamp/files` returns a recursive file listing within a specific archive. `GET /api/apps/:app/archives/:timestamp/files/*` reads a specific file's content. All endpoints validate paths against directory traversal. Returns empty array (not error) when no archives exist.
+
+### Custom Template Storage (core/template.ts, dashboard/api.ts)
+Custom templates are stored at `.ralph-flow/.templates/<name>/` with a generated `ralphflow.yaml` and scaffolded `loops/` directory. `POST /api/templates` accepts a `TemplateDefinition` (name, description, loops array with stages/completion/model/multi_agent) and creates the full directory structure. `GET /api/templates` returns both built-in and custom templates with metadata (type, description, loopCount). `DELETE /api/templates/:name` removes custom templates; built-in templates return 403. `POST /api/apps` resolves custom templates via `resolveTemplatePathWithCustom()` alongside built-ins. Loop keys are auto-suffixed with `-loop` to follow convention. Template names are validated against traversal and built-in name collisions.
 
 ### Dashboard Notification UI (ui/index.html)
 The Interactive panel (left column, top) renders per-loop attention notifications. Notifications are stored in `notificationsList` (client-side array hydrated from `GET /api/notifications` on load). Each card shows timestamp, message, and dismiss (X) button. Sidebar loop items display a `.notif-badge` count for undismissed notifications. Browser `Notification` API permission is requested on first notification; desktop toasts fire when the tab is in the background. An audible two-note chime (Web Audio API, ~250ms) plays on each notification — AudioContext is lazily initialized on first user interaction to satisfy browser autoplay policies.
