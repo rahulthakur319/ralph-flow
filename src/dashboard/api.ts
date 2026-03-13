@@ -4,7 +4,10 @@ import { join, resolve, basename } from 'node:path';
 import { listFlows, resolveFlowDir, loadConfig } from '../core/config.js';
 import { parseTracker } from '../core/status.js';
 import { getDb, getAllLoopStates } from '../core/db.js';
+import { copyTemplate } from '../core/template.js';
 import type { RalphFlowConfig } from '../core/types.js';
+
+const TEMPLATES = ['code-implementation', 'research'] as const;
 
 export function createApiRoutes(cwd: string, port: number = 4242): Hono {
   const api = new Hono();
@@ -40,6 +43,59 @@ export function createApiRoutes(cwd: string, port: number = 4242): Hono {
       };
     });
     return c.json(apps);
+  });
+
+  // POST /api/apps — create a new app from a template
+  api.post('/api/apps', async (c) => {
+    const body = await c.req.json<{ template?: string; name?: string }>();
+    const { template, name } = body;
+
+    // Validate template
+    if (!template || !TEMPLATES.includes(template as typeof TEMPLATES[number])) {
+      return c.json({ error: `Invalid template. Available: ${TEMPLATES.join(', ')}` }, 400);
+    }
+
+    // Validate name
+    if (!name || name.trim().length === 0) {
+      return c.json({ error: 'Name is required' }, 400);
+    }
+
+    // Path safety: no traversal or slashes
+    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+      return c.json({ error: 'Invalid name: must not contain "..", "/", or "\\"' }, 400);
+    }
+
+    const appName = name.trim();
+    const flowDir = join(cwd, '.ralph-flow', appName);
+
+    // Check for duplicate
+    if (existsSync(flowDir)) {
+      return c.json({ error: `App "${appName}" already exists` }, 409);
+    }
+
+    // Check for CLAUDE.md
+    const claudeMdPath = join(cwd, 'CLAUDE.md');
+    const warning = existsSync(claudeMdPath)
+      ? null
+      : 'No CLAUDE.md found in project root. Consider creating one for better Claude context.';
+
+    // Scaffold the app
+    try {
+      copyTemplate(template, flowDir);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Failed to create app: ${msg}` }, 500);
+    }
+
+    return c.json({
+      ok: true,
+      appName,
+      warning,
+      commands: [
+        `npx ralphflow run story --flow ${appName}`,
+        `npx ralphflow e2e --flow ${appName}`,
+      ],
+    }, 201);
   });
 
   // GET /api/apps/:app/status — parsed tracker status for all loops
