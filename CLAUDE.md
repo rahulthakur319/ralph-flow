@@ -117,6 +117,9 @@ Same pattern in `template.ts` and `server.ts`.
 ### Claude Hooks Management (dashboard/hooks.ts)
 `installNotificationHook(cwd, port)` writes a Notification hook to `.claude/settings.local.json` that pipes Claude's attention events to the dashboard via `curl POST`. `removeNotificationHook(cwd)` removes only the RalphFlow-managed entry (identified by `# ralphflow-managed` marker comment), preserving user hooks. Both functions handle missing dirs, missing files, and malformed JSON gracefully.
 
+### Hook Lifecycle (dashboard/server.ts)
+`startDashboard()` automatically installs the notification hook on startup and removes it on shutdown. SIGINT/SIGTERM signal handlers call `close()` for cleanup on Ctrl+C. A `process.on('exit')` fallback ensures hook removal even if another handler exits first. Hook errors are caught and logged as warnings — never crash the dashboard. This works identically via `dashboard`, `run --ui`, or `e2e --ui`.
+
 ### Dashboard WebSocket Events
 - `status:full` — sent on connect and DB changes
 - `tracker:updated` — sent on tracker.md file change (debounced 300ms)
