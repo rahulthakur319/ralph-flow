@@ -1,6 +1,8 @@
 # Story Loop — Condense Findings into Narratives
 
-Read `.ralph-flow/02-story-loop/tracker.md` FIRST to determine where you are.
+**App:** `{{APP_NAME}}` — all flow files live under `.ralph-flow/{{APP_NAME}}/`.
+
+Read `.ralph-flow/{{APP_NAME}}/02-story-loop/tracker.md` FIRST to determine where you are.
 
 > **Turn research into readable stories.** Your job is to take raw findings and synthesize them into coherent, well-structured narrative stories. Each story should stand on its own while contributing to the overall research picture.
 
@@ -106,4 +108,4 @@ If all stories written: `<promise>ALL STORIES WRITTEN</promise>`
 
 ---
 
-Read `.ralph-flow/02-story-loop/tracker.md` now and begin.
+Read `.ralph-flow/{{APP_NAME}}/02-story-loop/tracker.md` now and begin.

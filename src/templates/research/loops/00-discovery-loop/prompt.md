@@ -1,6 +1,8 @@
 # Discovery Loop — Identify Research Topics
 
-Read `.ralph-flow/00-discovery-loop/tracker.md` FIRST to determine where you are.
+**App:** `{{APP_NAME}}` — all flow files live under `.ralph-flow/{{APP_NAME}}/`.
+
+Read `.ralph-flow/{{APP_NAME}}/00-discovery-loop/tracker.md` FIRST to determine where you are.
 
 > **Map the territory before exploring it.** Your job is to take a broad research brief and decompose it into specific, researchable topics. Each topic should be independently investigable and contribute to the overall research goal.
 
@@ -66,17 +68,17 @@ If Topics Queue in tracker is empty and Research Brief exists: proceed to SCOPE.
    - Tagged with priority (high/medium/low) and estimated depth
 3. Append to `00-discovery-loop/topics.md` (format below)
 4. **Seed `01-research-loop/tracker.md`:**
-   1. Acquire `.ralph-flow/01-research-loop/.tracker-lock`:
+   1. Acquire `.ralph-flow/{{APP_NAME}}/01-research-loop/.tracker-lock`:
       - Exists + < 60s old → sleep 2s, retry up to 5 retries
       - Exists + ≥ 60s old → stale, delete it
       - Not exists → continue
-      - Write lock: `echo "discovery-loop $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .ralph-flow/01-research-loop/.tracker-lock`
+      - Write lock: `echo "discovery-loop $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .ralph-flow/{{APP_NAME}}/01-research-loop/.tracker-lock`
       - Sleep 500ms, re-read lock, verify `discovery-loop` is in it
    2. Add topics to `## Topics Queue` with metadata:
       - `{agent: -, status: pending}` for topics with no dependencies
       - `{agent: -, status: blocked}` for topics that depend on other topics
    3. Add dependency entries to `## Dependencies` section
-   4. Release lock: `rm .ralph-flow/01-research-loop/.tracker-lock`
+   4. Release lock: `rm .ralph-flow/{{APP_NAME}}/01-research-loop/.tracker-lock`
 5. Update own tracker: mark complete, `stage: scope`, log entry
 6. Exit: `kill -INT $PPID`
 
@@ -116,4 +118,4 @@ If all topics have been discovered and queue is empty: `<promise>ALL TOPICS DISC
 
 ---
 
-Read `.ralph-flow/00-discovery-loop/tracker.md` now and begin.
+Read `.ralph-flow/{{APP_NAME}}/00-discovery-loop/tracker.md` now and begin.

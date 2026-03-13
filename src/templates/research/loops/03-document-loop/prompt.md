@@ -1,6 +1,8 @@
 # Document Loop — Compile Stories into Final Output
 
-Read `.ralph-flow/03-document-loop/tracker.md` FIRST to determine where you are.
+**App:** `{{APP_NAME}}` — all flow files live under `.ralph-flow/{{APP_NAME}}/`.
+
+Read `.ralph-flow/{{APP_NAME}}/03-document-loop/tracker.md` FIRST to determine where you are.
 
 > **This is an on-demand loop.** Unlike discovery, research, and story loops, this loop runs once to produce the final document. It reads all completed stories and compiles them into the requested output format.
 
@@ -119,4 +121,4 @@ Read `.ralph-flow/03-document-loop/tracker.md` FIRST to determine where you are.
 
 ---
 
-Read `.ralph-flow/03-document-loop/tracker.md` now and begin.
+Read `.ralph-flow/{{APP_NAME}}/03-document-loop/tracker.md` now and begin.

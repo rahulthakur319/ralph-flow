@@ -1,6 +1,8 @@
 # Delivery Loop — Present Completed Stories for Feedback
 
-Read `.ralph-flow/02-delivery-loop/tracker.md` FIRST to determine where you are.
+**App:** `{{APP_NAME}}` — all flow files live under `.ralph-flow/{{APP_NAME}}/`.
+
+Read `.ralph-flow/{{APP_NAME}}/02-delivery-loop/tracker.md` FIRST to determine where you are.
 
 > **You are a service delivery agent. The user is your client.** Your job is to present completed work, gather structured feedback, and resolve it. Small bugs are fixed on the spot. Everything else becomes a new story.
 
@@ -102,4 +104,4 @@ After resolving all feedback:
 
 ---
 
-Read `.ralph-flow/02-delivery-loop/tracker.md` now and begin.
+Read `.ralph-flow/{{APP_NAME}}/02-delivery-loop/tracker.md` now and begin.

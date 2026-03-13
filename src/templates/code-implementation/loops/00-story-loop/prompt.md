@@ -1,18 +1,30 @@
 # Story Loop — Break Stories into Structured Tasks
 
-Read `.ralph-flow/00-story-loop/tracker.md` FIRST to determine where you are.
+**App:** `{{APP_NAME}}` — all flow files live under `.ralph-flow/{{APP_NAME}}/`.
+
+Read `.ralph-flow/{{APP_NAME}}/00-story-loop/tracker.md` FIRST to determine where you are.
 
 > **Describe the destination, not the route.** Focus on what the user will experience, not how you'll build it. Surface anything that could go wrong — broken flows, overlooked edge cases, data at risk.
 
-> **READ-ONLY FOR SOURCE CODE.** Only write to: `01-tasks-loop/tasks.md`, `01-tasks-loop/tracker.md`, `00-story-loop/tracker.md`, `00-story-loop/stories.md`.
+> **READ-ONLY FOR SOURCE CODE.** Only write to: `.ralph-flow/{{APP_NAME}}/01-tasks-loop/tasks.md`, `.ralph-flow/{{APP_NAME}}/01-tasks-loop/tracker.md`, `.ralph-flow/{{APP_NAME}}/00-story-loop/tracker.md`, `.ralph-flow/{{APP_NAME}}/00-story-loop/stories.md`.
 
 **Pipeline:** `stories.md → YOU → tasks.md → 01-tasks-loop → code`
 
 ---
 
+## State Machine (3 stages per story)
+
+**FIRST — Check completion.** Read the tracker. If the Stories Queue has entries
+AND every entry is `[x]`, write `<promise>ALL STORIES PROCESSED</promise>` to
+the bottom of the tracker and `kill -INT $PPID`. Do NOT collect new stories.
+
+Pick the lowest-numbered `ready` story. NEVER process a `blocked` story.
+
+---
+
 ## No Stories? Collect Them
 
-If `stories.md` has no unprocessed stories and the tracker queue is empty/all done:
+If `stories.md` has no stories at all (first run, empty queue with no entries):
 1. Tell the user: *"No stories queued. Tell me what you want to build — describe features, problems, or goals in your own words."*
 2. Use `AskUserQuestion` to prompt: "What do you want to build or fix next?" (open-ended)
 3. As the user narrates, capture each distinct idea as a `## STORY-{N}: {Title}` in `stories.md` with description and `**Depends on:** None` (or dependencies if mentioned)
@@ -20,10 +32,6 @@ If `stories.md` has no unprocessed stories and the tracker queue is empty/all do
 5. Apply corrections, finalize `stories.md`, proceed to normal flow
 
 ---
-
-## State Machine (3 stages per story)
-
-Pick the lowest-numbered `ready` story. NEVER process a `blocked` story. If none are `ready`: `<promise>ALL STORIES PROCESSED</promise>`.
 
 ```
 ANALYZE   → Read story, explore codebase, map scope → stage: clarify
@@ -63,11 +71,11 @@ If Stories Queue in tracker is empty: read `stories.md`, scan `## STORY-{N}:` he
 5. **Sanity-check:** Do NOT embed specific file paths in tasks — describe *what* changes, not *where*. The tasks loop will explore the codebase itself.
 6. Append to `01-tasks-loop/tasks.md` (format below)
 7. **Update `01-tasks-loop/tracker.md` (with lock protocol):**
-   1. Acquire `.ralph-flow/01-tasks-loop/.tracker-lock`:
+   1. Acquire `.ralph-flow/{{APP_NAME}}/01-tasks-loop/.tracker-lock`:
       - Exists + < 60s old → sleep 2s, retry up to 5 times
       - Exists + ≥ 60s old → stale, delete it
       - Not exists → continue
-      - Write lock: `echo "story-loop $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .ralph-flow/01-tasks-loop/.tracker-lock`
+      - Write lock: `echo "story-loop $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .ralph-flow/{{APP_NAME}}/01-tasks-loop/.tracker-lock`
       - Sleep 500ms, re-read lock, verify `story-loop` is in it
    2. Add new Task Groups to `## Task Groups`
    3. Add new tasks to `## Tasks Queue` with multi-agent metadata:
@@ -78,7 +86,7 @@ If Stories Queue in tracker is empty: read `stories.md`, scan `## STORY-{N}:` he
    4. Add dependency entries to `## Dependencies` section (for tasks with dependencies only):
       - Example: `- TASK-15: [TASK-12]`
       - Tasks with `Depends on: None` are NOT added to Dependencies
-   5. Release lock: `rm .ralph-flow/01-tasks-loop/.tracker-lock`
+   5. Release lock: `rm .ralph-flow/{{APP_NAME}}/01-tasks-loop/.tracker-lock`
 8. Mark done in tracker: check off queue, completed mapping, `active_story: none`, `stage: analyze`, update Dependency Graph, log
 9. Exit: `kill -INT $PPID`
 
@@ -132,4 +140,4 @@ If Stories Queue in tracker is empty: read `stories.md`, scan `## STORY-{N}:` he
 
 ---
 
-Read `.ralph-flow/00-story-loop/tracker.md` now and begin.
+Read `.ralph-flow/{{APP_NAME}}/00-story-loop/tracker.md` now and begin.

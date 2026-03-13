@@ -11,28 +11,27 @@ Define pipelines as loops, coordinate parallel agents via file-based trackers, a
 ## Quick Start
 
 ```bash
-# 1. Make sure you have a CLAUDE.md in your project
-#    (or let Claude create one: claude "Initialize CLAUDE.md for this project")
+# In your project with a CLAUDE.md
+npx ralphflow
+```
 
-# 2. Initialize a flow
+The interactive menu lets you initialize apps, run individual loops, run all loops in sequence, launch the web dashboard, or check status — no flags needed.
+
+### Advanced Usage
+
+```bash
+# Non-interactive commands (same as before)
 npx ralphflow init --template code-implementation --name my-app
-
-# 3. Run the story loop — describe what you want to build
 npx ralphflow run story
-
-# 4. Run the tasks loop — agents implement your stories
 npx ralphflow run tasks
-
-# 5. Run with multiple agents — open multiple terminals
-npx ralphflow run tasks --multi-agent   # Terminal 1 → auto-assigns agent-1
-npx ralphflow run tasks --multi-agent   # Terminal 2 → auto-assigns agent-2
-npx ralphflow run tasks --multi-agent   # Terminal 3 → auto-assigns agent-3
-
-# 6. Deliver — review, get feedback, resolve
+npx ralphflow run tasks --multi-agent   # Multi-agent — one terminal per agent
 npx ralphflow run delivery
-
-# 7. Check progress anytime
 npx ralphflow status
+
+# Web dashboard
+npx ralphflow dashboard                 # Start dashboard at http://localhost:4242
+npx ralphflow run tasks --ui            # Run with live dashboard alongside
+npx ralphflow e2e --ui                  # E2E with live dashboard
 ```
 
 ## How It Works
@@ -99,8 +98,45 @@ Each `run` command opens a full interactive Claude Code session. Claude owns the
 
 **Options:**
 - `--multi-agent` — Run as a multi-agent instance (auto-assigns agent ID)
+- `--ui` — Start the web dashboard alongside execution
 - `-m, --model <model>` — Claude model to use
 - `-n, --max-iterations <n>` — Maximum iterations (default: 30)
+- `-f, --flow <name>` — Which flow to run (auto-detected if only one exists)
+
+### `npx ralphflow dashboard`
+
+Starts a real-time web dashboard at `http://localhost:4242`. Shows all apps, loop pipelines, tracker status, and lets you edit prompt files — all updated live via WebSocket as agents work.
+
+```bash
+npx ralphflow dashboard              # Default port 4242
+npx ralphflow dashboard -p 3000      # Custom port
+npx ralphflow ui                     # Alias
+```
+
+**Features:**
+- Live pipeline view with color-coded status (complete/running/pending)
+- Per-loop detail: stage, active item, progress bar, agent table
+- Prompt editor with Cmd+S save and dirty indicator
+- Live tracker viewer (auto-updates as agents write)
+- WebSocket auto-reconnect with exponential backoff
+
+**Options:**
+- `-p, --port <port>` — Port number (default: 4242)
+
+### `npx ralphflow e2e`
+
+Runs all loops end-to-end with SQLite orchestration. Skips loops already completed.
+
+```bash
+npx ralphflow e2e                   # Run all loops
+npx ralphflow e2e --ui              # With live dashboard
+npx ralphflow e2e --flow my-app     # Specific flow
+```
+
+**Options:**
+- `--ui` — Start the web dashboard alongside execution
+- `-m, --model <model>` — Claude model to use
+- `-n, --max-iterations <n>` — Maximum iterations per loop (default: 30)
 - `-f, --flow <name>` — Which flow to run (auto-detected if only one exists)
 
 ### `npx ralphflow status`

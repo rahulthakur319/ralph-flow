@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RalphFlow Dashboard</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-surface: #161b22;
+    --bg-hover: #1c2128;
+    --bg-active: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-muted: #484f58;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --blue: #58a6ff;
+    --yellow: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --radius: 6px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-surface);
+    flex-shrink: 0;
+  }
+  .header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+  .header .host {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* Main layout */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 240px;
+    border-right: 1px solid var(--border);
+    background: var(--bg-surface);
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .sidebar-section {
+    padding: 12px 0;
+  }
+  .sidebar-label {
+    padding: 0 16px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .sidebar-item {
+    display: block;
+    padding: 6px 16px;
+    font-size: 13px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: background 0.1s;
+  }
+  .sidebar-item:hover { background: var(--bg-hover); color: var(--text); }
+  .sidebar-item.active {
+    background: var(--bg-active);
+    color: var(--text);
+    border-left-color: var(--accent);
+  }
+  .sidebar-item.app-item {
+    font-weight: 600;
+    color: var(--text);
+    padding: 8px 16px;
+  }
+  .sidebar-item.loop-item { padding-left: 32px; font-size: 12px; }
+  .sidebar-item .badge {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 6px;
+    background: var(--bg-hover);
+    color: var(--text-dim);
+  }
+
+  /* Content */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+  }
+  .content-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  /* App header */
+  .app-header { margin-bottom: 24px; }
+  .app-header h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .app-type-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--purple);
+    background: rgba(188, 140, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-right: 8px;
+  }
+  .app-desc {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+
+  /* Pipeline view */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 28px;
+    padding: 16px 0;
+  }
+  .pipeline-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    transition: border-color 0.15s, background 0.15s;
+    min-width: 120px;
+  }
+  .pipeline-node:hover { border-color: var(--text-dim); }
+  .pipeline-node.selected { border-color: var(--accent); background: rgba(88, 166, 255, 0.05); }
+  .pipeline-node .node-name { font-size: 12px; font-weight: 600; }
+  .pipeline-node .node-status {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .pipeline-node .node-status.complete { background: rgba(63,185,80,0.15); color: var(--green); }
+  .pipeline-node .node-status.running { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .pipeline-node .node-status.pending { background: rgba(139,148,158,0.1); color: var(--text-muted); }
+  .pipeline-connector {
+    width: 32px;
+    height: 2px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 24px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  /* Loop detail */
+  .loop-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .meta-card {
+    padding: 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .meta-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .meta-value {
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    height: 6px;
+    background: var(--bg-active);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+
+  /* Agent table */
+  .agent-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+  .agent-table th {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 11px;
+  }
+  .agent-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  .agent-table tr:hover td { background: var(--bg-hover); }
+
+  /* Editor */
+  .editor-wrap {
+    position: relative;
+  }
+  .editor {
+    width: 100%;
+    min-height: 300px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 16px;
+    resize: vertical;
+    outline: none;
+    tab-size: 2;
+  }
+  .editor:focus { border-color: var(--accent); }
+  .editor-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+  }
+  .btn {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+    background: var(--bg-surface);
+    color: var(--text);
+  }
+  .btn:hover { background: var(--bg-hover); border-color: var(--text-dim); }
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { background: #79c0ff; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .dirty-indicator {
+    font-size: 11px;
+    color: var(--yellow);
+  }
+  .save-ok {
+    font-size: 11px;
+    color: var(--green);
+  }
+
+  /* Tracker viewer */
+  .tracker-viewer {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    max-height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .tracker-viewer h1, .tracker-viewer h2, .tracker-viewer h3 {
+    font-family: var(--sans);
+    margin: 12px 0 6px;
+  }
+  .tracker-viewer h1 { font-size: 16px; }
+  .tracker-viewer h2 { font-size: 14px; }
+  .tracker-viewer h3 { font-size: 13px; }
+  .tracker-viewer .cb-done { color: var(--green); }
+  .tracker-viewer .cb-todo { color: var(--text-muted); }
+  .tracker-viewer table {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+  }
+  .tracker-viewer th, .tracker-viewer td {
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    text-align: left;
+    font-size: 12px;
+  }
+  .tracker-viewer th { background: var(--bg-active); color: var(--text-dim); }
+
+  /* Status bar */
+  .statusbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 6px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+    font-size: 11px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .status-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 4px;
+  }
+  .status-dot.connected { background: var(--green); }
+  .status-dot.disconnected { background: var(--red); }
+  .status-dot.connecting { background: var(--yellow); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>RalphFlow Dashboard</h1>
+  <span class="host" id="hostDisplay"></span>
+</div>
+
+<div class="main">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Apps</div>
+      <div id="sidebarApps"></div>
+    </div>
+  </div>
+  <div class="content" id="content">
+    <div class="content-empty">Select an app to view details</div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <span><span class="status-dot disconnected" id="statusDot"></span> <span id="statusText">Connecting...</span></span>
+  <span>Last update: <span id="lastUpdate">--</span></span>
+  <span>Events: <span id="eventCount">0</span></span>
+</div>
+
+<script>
+(function() {
+  // State
+  let apps = [];
+  let selectedApp = null;
+  let selectedLoop = null;
+  let eventCounter = 0;
+  let promptDirty = false;
+  let promptOriginal = '';
+  let ws = null;
+  let reconnectDelay = 1000;
+
+  // DOM refs
+  const $ = (sel) => document.querySelector(sel);
+  const hostDisplay = $('#hostDisplay');
+  const sidebarApps = $('#sidebarApps');
+  const content = $('#content');
+  const statusDot = $('#statusDot');
+  const statusText = $('#statusText');
+  const lastUpdate = $('#lastUpdate');
+  const eventCountEl = $('#eventCount');
+
+  hostDisplay.textContent = location.host;
+
+  // WebSocket
+  function connectWs() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+    ws.onopen = () => {
+      statusDot.className = 'status-dot connected';
+      statusText.textContent = 'Connected';
+      reconnectDelay = 1000;
+    };
+
+    ws.onclose = () => {
+      statusDot.className = 'status-dot disconnected';
+      statusText.textContent = 'Disconnected';
+      setTimeout(connectWs, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+
+    ws.onmessage = (e) => {
+      const event = JSON.parse(e.data);
+      eventCounter++;
+      eventCountEl.textContent = eventCounter;
+      lastUpdate.textContent = new Date().toLocaleTimeString();
+      handleWsEvent(event);
+    };
+  }
+
+  function handleWsEvent(event) {
+    if (event.type === 'status:full') {
+      apps = event.apps;
+      renderSidebar();
+      if (selectedApp) {
+        const updated = apps.find(a => a.appName === selectedApp.appName);
+        if (updated) {
+          selectedApp = updated;
+          renderContent();
+        }
+      }
+    } else if (event.type === 'tracker:updated') {
+      if (selectedApp && selectedApp.appName === event.app) {
+        // Update the loop status in our local state
+        const loopEntry = selectedApp.loops.find(l => l.key === event.loop);
+        if (loopEntry) {
+          loopEntry.status = event.status;
+        }
+        renderContent();
+        // Refresh tracker viewer if this loop is selected
+        if (selectedLoop === event.loop) {
+          loadTracker(event.app, event.loop);
+        }
+      }
+    } else if (event.type === 'file:changed') {
+      if (selectedApp && selectedApp.appName === event.app) {
+        // Refresh status
+        fetchAppStatus(event.app);
+      }
+    }
+  }
+
+  // API helpers
+  async function fetchJson(url) {
+    const res = await fetch(url);
+    return res.json();
+  }
+
+  async function fetchApps() {
+    apps = await fetchJson('/api/apps');
+    renderSidebar();
+    if (apps.length > 0 && !selectedApp) {
+      selectApp(apps[0]);
+    }
+  }
+
+  async function fetchAppStatus(appName) {
+    const statuses = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/status`);
+    if (selectedApp && selectedApp.appName === appName) {
+      statuses.forEach(s => {
+        const loop = selectedApp.loops.find(l => l.key === s.key);
+        if (loop) loop.status = s;
+      });
+      renderContent();
+    }
+  }
+
+  // Sidebar
+  function renderSidebar() {
+    let html = '';
+    for (const app of apps) {
+      const appActive = selectedApp && selectedApp.appName === app.appName;
+      html += `<div class="sidebar-item app-item${appActive ? ' active' : ''}" data-app="${esc(app.appName)}">
+        ${esc(app.appName)}
+        <span class="badge">${esc(app.appType)}</span>
+      </div>`;
+      if (app.loops) {
+        for (const loop of app.loops) {
+          const loopActive = appActive && selectedLoop === loop.key;
+          html += `<div class="sidebar-item loop-item${loopActive ? ' active' : ''}" data-app="${esc(app.appName)}" data-loop="${esc(loop.key)}">
+            ${esc(loop.name)}
+          </div>`;
+        }
+      }
+    }
+    sidebarApps.innerHTML = html;
+
+    // Event delegation
+    sidebarApps.querySelectorAll('.app-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const app = apps.find(a => a.appName === el.dataset.app);
+        if (app) selectApp(app);
+      });
+    });
+    sidebarApps.querySelectorAll('.loop-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const app = apps.find(a => a.appName === el.dataset.app);
+        if (app) {
+          selectApp(app);
+          selectLoop(el.dataset.loop);
+        }
+      });
+    });
+  }
+
+  function selectApp(app) {
+    selectedApp = app;
+    selectedLoop = app.loops.length > 0 ? app.loops[0].key : null;
+    promptDirty = false;
+    renderSidebar();
+    renderContent();
+    fetchAppStatus(app.appName);
+  }
+
+  function selectLoop(loopKey) {
+    selectedLoop = loopKey;
+    promptDirty = false;
+    renderSidebar();
+    renderContent();
+  }
+
+  // Main content
+  function renderContent() {
+    if (!selectedApp) {
+      content.innerHTML = '<div class="content-empty">Select an app to view details</div>';
+      return;
+    }
+
+    const app = selectedApp;
+    const currentLoop = app.loops.find(l => l.key === selectedLoop);
+
+    let html = '';
+
+    // App header
+    html += `<div class="app-header">
+      <h2>${esc(app.appName)}</h2>
+      <span class="app-type-badge">${esc(app.appType)}</span>
+      ${app.description ? `<div class="app-desc">${esc(app.description)}</div>` : ''}
+    </div>`;
+
+    // Pipeline
+    html += '<div class="section"><div class="section-title">Pipeline</div><div class="pipeline">';
+    app.loops.forEach((loop, i) => {
+      if (i > 0) html += '<div class="pipeline-connector"></div>';
+      const statusClass = getLoopStatusClass(loop);
+      const isSelected = loop.key === selectedLoop;
+      html += `<div class="pipeline-node${isSelected ? ' selected' : ''}" data-loop="${esc(loop.key)}">
+        <span class="node-name">${esc(loop.name)}</span>
+        <span class="node-status ${statusClass}">${statusClass}</span>
+      </div>`;
+    });
+    html += '</div></div>';
+
+    // Loop detail
+    if (currentLoop) {
+      const st = currentLoop.status || {};
+      html += `<div class="section">
+        <div class="section-title">Loop Detail: ${esc(currentLoop.name)}</div>
+        <div class="loop-meta">
+          <div class="meta-card"><div class="meta-label">Stage</div><div class="meta-value">${esc(st.stage || '—')}</div></div>
+          <div class="meta-card"><div class="meta-label">Active</div><div class="meta-value">${esc(st.active || 'none')}</div></div>
+          <div class="meta-card">
+            <div class="meta-label">Progress</div>
+            <div class="meta-value">${st.completed || 0}/${st.total || 0}</div>
+            <div class="progress-bar"><div class="progress-fill" style="width:${st.total ? (st.completed / st.total * 100) : 0}%"></div></div>
+          </div>
+          <div class="meta-card"><div class="meta-label">Stages</div><div class="meta-value" style="font-size:11px">${(currentLoop.stages || []).join(' → ')}</div></div>
+        </div>`;
+
+      // Agent table
+      if (st.agents && st.agents.length > 0) {
+        html += `<div style="margin-bottom:16px">
+          <table class="agent-table">
+            <thead><tr><th>Agent</th><th>Active Task</th><th>Stage</th><th>Heartbeat</th></tr></thead>
+            <tbody>`;
+        for (const ag of st.agents) {
+          html += `<tr><td>${esc(ag.name)}</td><td>${esc(ag.activeTask)}</td><td>${esc(ag.stage)}</td><td>${esc(ag.lastHeartbeat)}</td></tr>`;
+        }
+        html += '</tbody></table></div>';
+      }
+
+      html += '</div>';
+
+      // Prompt editor
+      html += `<div class="section">
+        <div class="section-title">Prompt Editor</div>
+        <div class="editor-wrap">
+          <textarea class="editor" id="promptEditor" placeholder="Loading..."></textarea>
+          <div class="editor-actions">
+            <button class="btn btn-primary" id="savePromptBtn" disabled>Save</button>
+            <button class="btn" id="resetPromptBtn" disabled>Reset</button>
+            <span class="dirty-indicator" id="dirtyIndicator" style="display:none">Unsaved changes</span>
+            <span class="save-ok" id="saveOk" style="display:none">Saved</span>
+          </div>
+        </div>
+      </div>`;
+
+      // Tracker viewer
+      html += `<div class="section">
+        <div class="section-title">Tracker (live, read-only)</div>
+        <div class="tracker-viewer" id="trackerViewer">Loading...</div>
+      </div>`;
+    }
+
+    content.innerHTML = html;
+
+    // Bind pipeline node clicks
+    content.querySelectorAll('.pipeline-node').forEach(el => {
+      el.addEventListener('click', () => selectLoop(el.dataset.loop));
+    });
+
+    // Load prompt + tracker
+    if (currentLoop) {
+      loadPrompt(app.appName, currentLoop.key);
+      loadTracker(app.appName, currentLoop.key);
+    }
+  }
+
+  async function loadPrompt(appName, loopKey) {
+    const editor = $('#promptEditor');
+    if (!editor) return;
+
+    try {
+      const data = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/loops/${encodeURIComponent(loopKey)}/prompt`);
+      editor.value = data.content || '';
+      promptOriginal = editor.value;
+      promptDirty = false;
+      updateDirtyState();
+
+      editor.addEventListener('input', () => {
+        promptDirty = editor.value !== promptOriginal;
+        updateDirtyState();
+      });
+
+      // Cmd/Ctrl+S to save
+      editor.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+          e.preventDefault();
+          savePrompt(appName, loopKey);
+        }
+      });
+
+      const saveBtn = $('#savePromptBtn');
+      const resetBtn = $('#resetPromptBtn');
+      if (saveBtn) saveBtn.addEventListener('click', () => savePrompt(appName, loopKey));
+      if (resetBtn) resetBtn.addEventListener('click', () => {
+        editor.value = promptOriginal;
+        promptDirty = false;
+        updateDirtyState();
+      });
+    } catch {
+      editor.value = '(Error loading prompt)';
+    }
+  }
+
+  async function savePrompt(appName, loopKey) {
+    const editor = $('#promptEditor');
+    if (!editor || !promptDirty) return;
+
+    try {
+      await fetch(`/api/apps/${encodeURIComponent(appName)}/loops/${encodeURIComponent(loopKey)}/prompt`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editor.value }),
+      });
+      promptOriginal = editor.value;
+      promptDirty = false;
+      updateDirtyState();
+      const saveOk = $('#saveOk');
+      if (saveOk) {
+        saveOk.style.display = 'inline';
+        setTimeout(() => { saveOk.style.display = 'none'; }, 2000);
+      }
+    } catch {
+      alert('Failed to save prompt');
+    }
+  }
+
+  function updateDirtyState() {
+    const saveBtn = $('#savePromptBtn');
+    const resetBtn = $('#resetPromptBtn');
+    const indicator = $('#dirtyIndicator');
+    if (saveBtn) saveBtn.disabled = !promptDirty;
+    if (resetBtn) resetBtn.disabled = !promptDirty;
+    if (indicator) indicator.style.display = promptDirty ? 'inline' : 'none';
+  }
+
+  async function loadTracker(appName, loopKey) {
+    const viewer = $('#trackerViewer');
+    if (!viewer) return;
+
+    try {
+      const data = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/loops/${encodeURIComponent(loopKey)}/tracker`);
+      viewer.innerHTML = renderMarkdown(data.content || '(empty)');
+    } catch {
+      viewer.innerHTML = '(No tracker file found)';
+    }
+  }
+
+  // Minimal markdown renderer
+  function renderMarkdown(md) {
+    let html = '';
+    const lines = md.split('\n');
+    let inTable = false;
+    let tableHtml = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Table detection
+      if (line.match(/^\|.+\|$/)) {
+        if (!inTable) {
+          inTable = true;
+          tableHtml = '<table>';
+          // Header row
+          const cells = line.split('|').filter(Boolean).map(c => c.trim());
+          tableHtml += '<thead><tr>' + cells.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>';
+          continue;
+        }
+        // Separator row
+        if (line.match(/^\|[\s\-|]+\|$/)) continue;
+        // Data row
+        const cells = line.split('|').filter(Boolean).map(c => c.trim());
+        tableHtml += '<tr>' + cells.map(c => `<td>${esc(c)}</td>`).join('') + '</tr>';
+        continue;
+      } else if (inTable) {
+        inTable = false;
+        tableHtml += '</tbody></table>';
+        html += tableHtml;
+        tableHtml = '';
+      }
+
+      // Headers
+      if (line.startsWith('### ')) { html += `<h3>${esc(line.slice(4))}</h3>`; continue; }
+      if (line.startsWith('## ')) { html += `<h2>${esc(line.slice(3))}</h2>`; continue; }
+      if (line.startsWith('# ')) { html += `<h1>${esc(line.slice(2))}</h1>`; continue; }
+
+      // Checkboxes
+      if (line.match(/^- \[x\]/i)) {
+        html += `<div class="cb-done">${esc(line)}</div>`;
+        continue;
+      }
+      if (line.match(/^- \[ \]/)) {
+        html += `<div class="cb-todo">${esc(line)}</div>`;
+        continue;
+      }
+
+      // Regular lines
+      html += line.trim() === '' ? '<br>' : `<div>${esc(line)}</div>`;
+    }
+
+    if (inTable) {
+      tableHtml += '</tbody></table>';
+      html += tableHtml;
+    }
+
+    return html;
+  }
+
+  function getLoopStatusClass(loop) {
+    if (!loop.status) return 'pending';
+    const st = loop.status;
+    if (st.total > 0 && st.completed === st.total) return 'complete';
+    // Running if: has active agents, or has partial progress, or stage indicates activity (not idle/—)
+    if (st.agents && st.agents.length > 0) return 'running';
+    if (st.total > 0 && st.completed > 0 && st.completed < st.total) return 'running';
+    if (st.stage && st.stage !== '—' && st.stage !== 'idle') return 'running';
+    return 'pending';
+  }
+
+  function esc(s) {
+    if (s == null) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+  }
+
+  // Init
+  fetchApps();
+  connectWs();
+})();
+</script>
+</body>
+</html>

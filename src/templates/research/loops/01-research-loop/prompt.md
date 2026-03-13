@@ -1,10 +1,12 @@
 # Research Loop — Investigate Topics
 
+**App:** `{{APP_NAME}}` — all flow files live under `.ralph-flow/{{APP_NAME}}/`.
+
 **You are agent `{{AGENT_NAME}}`.** Multiple agents may work in parallel.
 Coordinate via `tracker.md` — the single source of truth.
 *(If you see the literal text `{{AGENT_NAME}}` above — i.e., it was not substituted — treat your name as `agent-1`.)*
 
-Read `.ralph-flow/01-research-loop/tracker.md` FIRST to determine where you are.
+Read `.ralph-flow/{{APP_NAME}}/01-research-loop/tracker.md` FIRST to determine where you are.
 
 > **Go deep, stay focused.** Each topic is a specific research question. Your job is to investigate thoroughly and produce structured findings. Use web search, file reading, and any available tools to gather evidence.
 
@@ -16,20 +18,20 @@ Read `.ralph-flow/01-research-loop/tracker.md` FIRST to determine where you are.
 
 Before ANY write to `tracker.md`, you MUST acquire the lock:
 
-**Lock file:** `.ralph-flow/01-research-loop/.tracker-lock`
+**Lock file:** `.ralph-flow/{{APP_NAME}}/01-research-loop/.tracker-lock`
 
 ### Acquire Lock
 1. Check if `.tracker-lock` exists
    - Exists AND file is < 60 seconds old → sleep 2s, retry (up to 5 retries)
    - Exists AND file is ≥ 60 seconds old → stale lock, delete it (agent crashed mid-write)
    - Does not exist → continue
-2. Write lock: `echo "{{AGENT_NAME}} $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .ralph-flow/01-research-loop/.tracker-lock`
+2. Write lock: `echo "{{AGENT_NAME}} $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .ralph-flow/{{APP_NAME}}/01-research-loop/.tracker-lock`
 3. Sleep 500ms (`sleep 0.5`)
 4. Re-read `.tracker-lock` — verify YOUR agent name (`{{AGENT_NAME}}`) is in it
    - Your name → you own the lock, proceed to write `tracker.md`
    - Other name → you lost the race, retry from step 1
 5. Write your changes to `tracker.md`
-6. Delete `.tracker-lock` immediately: `rm .ralph-flow/01-research-loop/.tracker-lock`
+6. Delete `.tracker-lock` immediately: `rm .ralph-flow/{{APP_NAME}}/01-research-loop/.tracker-lock`
 7. Never leave a lock held — if your write fails, delete the lock in your error handler
 
 ### When to Lock
@@ -179,4 +181,4 @@ If Topics Queue in tracker is empty: read `topics.md`, scan `## TOPIC-{N}:` head
 
 ---
 
-Read `.ralph-flow/01-research-loop/tracker.md` now and begin.
+Read `.ralph-flow/{{APP_NAME}}/01-research-loop/tracker.md` now and begin.

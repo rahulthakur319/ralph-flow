@@ -1,6 +1,6 @@
 {
   "name": "ralphflow",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Multi-agent AI workflow orchestration framework for Claude Code. Define pipelines as loops, coordinate parallel agents, and ship structured work.",
   "type": "module",
   "bin": {
@@ -47,9 +47,13 @@
   },
   "files": [
     "dist/",
-    "src/templates/"
+    "src/templates/",
+    "src/dashboard/ui/"
   ],
   "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@inquirer/prompts": "^8.3.0",
+    "better-sqlite3": "^12.6.2",
     "chalk": "^5.3.0",
     "chokidar": "^4.0.0",
     "cli-table3": "^0.6.5",
@@ -60,6 +64,7 @@
     "yaml": "^2.6.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.0",
     "tsup": "^8.3.0",

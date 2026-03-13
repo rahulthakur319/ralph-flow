@@ -1,24 +1,22 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { runLoop } from '../core/runner.js';
+import { runE2E } from '../core/runner.js';
 
-export const runCommand = new Command('run')
-  .description('Run a loop')
-  .argument('<loop>', 'Loop to run (story, tasks, delivery, discovery, research, document)')
-  .option('--multi-agent', 'Run as a multi-agent instance (auto-assigns agent ID)')
+export const e2eCommand = new Command('e2e')
+  .description('Run all loops end-to-end with SQLite orchestration (skips completed loops)')
   .option('-m, --model <model>', 'Claude model to use')
-  .option('-n, --max-iterations <n>', 'Maximum iterations', '30')
+  .option('-n, --max-iterations <n>', 'Maximum iterations per loop', '30')
   .option('-f, --flow <name>', 'Which flow to run (auto-detected if only one)')
   .option('--ui', 'Start web dashboard alongside execution')
-  .action(async (loop, opts) => {
+  .action(async (opts) => {
     try {
       let dashboardHandle: { close: () => void } | undefined;
       if (opts.ui) {
         const { startDashboard } = await import('../dashboard/server.js');
         dashboardHandle = await startDashboard({ cwd: process.cwd() });
       }
-      await runLoop(loop, {
-        multiAgent: !!opts.multiAgent,
+      await runE2E({
+        multiAgent: false,
         model: opts.model,
         maxIterations: parseInt(opts.maxIterations, 10),
         flow: opts.flow,

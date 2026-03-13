@@ -2,7 +2,10 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { initCommand } from './init.js';
 import { runCommand } from './run.js';
+import { e2eCommand } from './e2e.js';
 import { statusCommand } from './status.js';
+import { dashboardCommand } from './dashboard.js';
+import { interactiveMenu } from './menu.js';
 
 export const program = new Command()
   .name('ralphflow')
@@ -10,7 +13,12 @@ export const program = new Command()
   .version('0.1.0')
   .addCommand(initCommand)
   .addCommand(runCommand)
-  .addCommand(statusCommand);
+  .addCommand(e2eCommand)
+  .addCommand(statusCommand)
+  .addCommand(dashboardCommand)
+  .action(async () => {
+    await interactiveMenu(process.cwd());
+  });
 
 // Graceful Ctrl+C handling at the top level
 process.on('SIGINT', () => {

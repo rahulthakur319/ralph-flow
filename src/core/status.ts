@@ -74,7 +74,7 @@ export async function showStatus(cwd: string, flowName?: string): Promise<void> 
   console.log();
 }
 
-function parseTracker(trackerPath: string, flowDir: string, loopName: string): TrackerStatus {
+export function parseTracker(trackerPath: string, flowDir: string, loopName: string): TrackerStatus {
   const fullPath = join(flowDir, trackerPath);
 
   const status: TrackerStatus = {
