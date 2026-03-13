@@ -60,6 +60,10 @@ export function resetLoopState(db: Database.Database, flow: string, loopKey: str
   db.prepare('DELETE FROM loop_state WHERE flow_name = ? AND loop_key = ?').run(flow, loopKey);
 }
 
+export function deleteFlowState(db: Database.Database, flow: string): void {
+  db.prepare('DELETE FROM loop_state WHERE flow_name = ?').run(flow);
+}
+
 export function getAllLoopStates(db: Database.Database, flow: string) {
   return db.prepare('SELECT * FROM loop_state WHERE flow_name = ?').all(flow);
 }
