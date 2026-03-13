@@ -127,6 +127,11 @@ The runner sets `RALPHFLOW_APP` (flow directory basename, e.g. `code-implementat
 - `status:full` — sent on connect and DB changes
 - `tracker:updated` — sent on tracker.md file change (debounced 300ms)
 - `file:changed` — sent on any .md/.yaml change in .ralph-flow/
+- `notification:attention` — broadcast when POST /api/notification receives a hook payload
+- `notification:dismissed` — broadcast when DELETE /api/notification/:id removes one
+
+### Dashboard Notification UI (ui/index.html)
+The Interactive panel (left column, top) renders per-loop attention notifications. Notifications are stored in `notificationsList` (client-side array hydrated from `GET /api/notifications` on load). Each card shows timestamp, message, and dismiss (X) button. Sidebar loop items display a `.notif-badge` count for undismissed notifications. Browser `Notification` API permission is requested on first notification; desktop toasts fire when the tab is in the background.
 
 ## Conventions
 
