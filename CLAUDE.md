@@ -1,0 +1,142 @@
+# RalphFlow
+
+Multi-agent AI workflow orchestration framework for Claude Code. Define pipelines as loops, coordinate parallel agents via file-based trackers, and ship structured work.
+
+## Architecture
+
+```
+src/
+├── bin/ralphflow.ts          — CLI entry point (shebang, parses commander program)
+├── cli/
+│   ├── index.ts              — Commander program: mounts all commands, default → interactive menu
+│   ├── init.ts               — `init` command: scaffold flow from template
+│   ├── run.ts                — `run <loop>` command: single/multi-agent loop execution, --ui flag
+│   ├── e2e.ts                — `e2e` command: orchestrated all-loops execution with SQLite, --ui flag
+│   ├── status.ts             — `status` command: renders loop status table
+│   ├── dashboard.ts          — `dashboard` command (alias: `ui`): starts web server
+│   └── menu.ts               — Interactive menu via @inquirer/prompts
+├── core/
+│   ├── index.ts              — Public API re-exports
+│   ├── types.ts              — All TypeScript interfaces (RalphFlowConfig, LoopConfig, TrackerStatus, etc.)
+│   ├── config.ts             — YAML config loading, flow/loop resolution, alias matching
+│   ├── runner.ts             — Iteration engine: spawn Claude, detect completion, multi-agent coordination
+│   ├── claude.ts             — spawnClaude(): child_process.spawn with stdio: 'inherit'
+│   ├── db.ts                 — SQLite (better-sqlite3, WAL mode): loop_state table, status tracking
+│   ├── status.ts             — parseTracker(): regex-based tracker.md parsing (stage, checkboxes, agents)
+│   ├── init.ts               — initProject(): scaffold .ralph-flow/<name>/ from template
+│   └── template.ts           — Template path resolution (dev vs bundled), file copying, variable substitution
+├── dashboard/
+│   ├── server.ts             — Hono HTTP + WebSocket server on 127.0.0.1:4242
+│   ├── api.ts                — REST endpoints: /api/apps, status, config, db, prompt CRUD, tracker, files
+│   ├── hooks.ts              — Claude Code Notification hook management for .claude/settings.local.json
+│   ├── watcher.ts            — Chokidar file watcher → WebSocket broadcast, DB polling every 2s
+│   └── ui/index.html         — Single-file vanilla JS frontend (dark theme, no build step)
+└── templates/
+    ├── claude-md.template.md — CLAUDE.md template with {{VAR}} substitution
+    ├── code-implementation/  — Story → Tasks → Delivery (3 loops, multi-agent on tasks)
+    └── research/             — Discovery → Research → Story → Document (4 loops, multi-agent on research)
+```
+
+## Tech Stack
+
+- **Language:** TypeScript 5.6, ESM (`"type": "module"`, `.js` import extensions)
+- **Bundler:** tsup (esbuild-based), single entry point → `dist/`
+- **CLI:** commander.js for commands, @inquirer/prompts for interactive menus
+- **Database:** better-sqlite3 with WAL mode for loop state persistence
+- **Web:** Hono + @hono/node-server (HTTP), ws (WebSocket), chokidar (file watching)
+- **Utilities:** chalk (terminal colors), cli-table3 (ASCII tables), yaml (YAML parsing), simple-git
+- **Target:** Node.js >= 18
+
+## Dev Commands
+
+```bash
+npm run build        # tsup → dist/ (ESM, node18 target)
+npm run dev          # tsup --watch
+npx tsc --noEmit     # Typecheck (no emit)
+npm run lint         # eslint src/
+```
+
+## CLI Command Tree
+
+```
+ralphflow
+├── (no args)              → interactive menu
+├── init                   → scaffold new flow
+│   ├── -t, --template     (code-implementation | research)
+│   └── -n, --name         flow name
+├── run <loop>             → run a loop
+│   ├── --multi-agent      run as multi-agent instance
+│   ├── --ui               start dashboard alongside
+│   ├── -m, --model        Claude model
+│   ├── -n, --max-iterations (default 30)
+│   └── -f, --flow         flow name
+├── e2e                    → run all loops end-to-end (SQLite orchestration)
+│   ├── --ui
+│   ├── -m, --model
+│   ├── -n, --max-iterations
+│   └── -f, --flow
+├── status                 → show loop status
+│   └── -f, --flow
+└── dashboard (alias: ui)  → start web dashboard
+    └── -p, --port         (default 4242)
+```
+
+## Key Patterns
+
+### Path Resolution (dev vs bundled)
+Templates and UI assets use dual-path resolution:
+- Dev: `__dirname` → `../../templates/` (src/core/ → src/templates/)
+- Bundled: `__dirname` → `../../src/templates/` (dist/ → src/templates/)
+Same pattern in `template.ts` and `server.ts`.
+
+### Completion Detection (4-level hierarchy in runner.ts)
+1. `<promise>COMPLETION_STRING</promise>` in tracker
+2. Plain text `COMPLETION_STRING` anywhere in tracker
+3. All checkboxes checked (`- [x]` > 0, `- [ ]` = 0)
+4. Metadata: all items have `{status: completed}`, none `in_progress`/`pending`
+
+### Multi-Agent Coordination
+- PID-based lock files in `.agents/` directory next to tracker
+- `acquireAgentId()` claims `agent-N.lock`, `releaseAgentId()` removes on exit
+- Stale agents auto-cleaned if PID not alive
+- Prompt substitution: `{{AGENT_NAME}}` → `agent-1`, `{{APP_NAME}}` → flow dir name
+
+### Tracker Format (Markdown)
+```markdown
+- stage: analyze
+- active_task: TASK-3
+- completed_tasks: [TASK-1, TASK-2]
+
+| agent | active_task | stage | last_heartbeat |
+|-------|-------------|-------|----------------|
+
+- [x] TASK-1: Description {agent: agent-1, status: completed}
+- [ ] TASK-2: Description {agent: agent-2, status: in_progress}
+```
+
+### Claude Hooks Management (dashboard/hooks.ts)
+`installNotificationHook(cwd, port)` writes a Notification hook to `.claude/settings.local.json` that pipes Claude's attention events to the dashboard via `curl POST`. `removeNotificationHook(cwd)` removes only the RalphFlow-managed entry (identified by `# ralphflow-managed` marker comment), preserving user hooks. Both functions handle missing dirs, missing files, and malformed JSON gracefully.
+
+### Dashboard WebSocket Events
+- `status:full` — sent on connect and DB changes
+- `tracker:updated` — sent on tracker.md file change (debounced 300ms)
+- `file:changed` — sent on any .md/.yaml change in .ralph-flow/
+
+## Conventions
+
+- All imports use `.js` extensions (ESM)
+- `__dirname` via `dirname(fileURLToPath(import.meta.url))`
+- Loop keys are kebab-case: `story-loop`, `tasks-loop`
+- Agent IDs are sequential: `agent-1`, `agent-2`, ...
+- Config lives in `.ralph-flow/<appName>/ralphflow.yaml`
+- No test framework — verification is manual and via the dashboard
+- `package.json` `files` field: `dist/`, `src/templates/`, `src/dashboard/ui/`
+- External deps `@inquirer/prompts` and `better-sqlite3` are marked external in tsup (not bundled)
+
+## Publishing
+
+```bash
+npm run build         # prepublishOnly runs this automatically
+npm publish --otp=... # Publishes to npm as "ralphflow"
+git push origin main  # GitHub: rahulthakur319/ralph-flow
+```
