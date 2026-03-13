@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * Resolve the path to a template directory.
  * Works both in dev (src/core/ -> src/templates/) and when bundled (dist/ -> src/templates/).
  */
-function resolveTemplatePath(templateName: string): string {
+export function resolveTemplatePath(templateName: string): string {
   const candidates = [
     join(__dirname, '..', 'templates', templateName),              // dev: src/core/ -> src/templates/
     join(__dirname, '..', 'src', 'templates', templateName),       // bundled: dist/ -> src/templates/

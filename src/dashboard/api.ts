@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, rmSync, cpSync, mkdirSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { listFlows, resolveFlowDir, loadConfig } from '../core/config.js';
 import { parseTracker } from '../core/status.js';
-import { getDb, getAllLoopStates } from '../core/db.js';
-import { copyTemplate } from '../core/template.js';
+import { getDb, getAllLoopStates, deleteFlowState } from '../core/db.js';
+import { copyTemplate, resolveTemplatePath } from '../core/template.js';
 import type { RalphFlowConfig } from '../core/types.js';
 
 const TEMPLATES = ['code-implementation', 'research'] as const;
@@ -122,6 +122,152 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
         `npx ralphflow e2e --flow ${appName}`,
       ],
     }, 201);
+  });
+
+  // DELETE /api/apps/:app — delete an app (directory + DB rows)
+  api.delete('/api/apps/:app', (c) => {
+    const appName = c.req.param('app');
+
+    // Path safety: no traversal or slashes
+    if (appName.includes('..') || appName.includes('/') || appName.includes('\\')) {
+      return c.json({ error: 'Invalid name: must not contain "..", "/", or "\\"' }, 400);
+    }
+
+    const flowDir = join(cwd, '.ralph-flow', appName);
+    if (!existsSync(flowDir)) {
+      return c.json({ error: `App "${appName}" not found` }, 404);
+    }
+
+    // Remove directory
+    rmSync(flowDir, { recursive: true, force: true });
+
+    // Clean up DB rows (best-effort)
+    try {
+      const db = getDb(cwd);
+      deleteFlowState(db, appName);
+    } catch {
+      // DB cleanup is best-effort
+    }
+
+    // Remove matching notifications from in-memory store
+    for (let i = notifications.length - 1; i >= 0; i--) {
+      if (notifications[i].app === appName) {
+        notifications.splice(i, 1);
+      }
+    }
+
+    return c.json({ ok: true, appName });
+  });
+
+  // POST /api/apps/:app/archive — archive current state and reset app
+  api.post('/api/apps/:app/archive', (c) => {
+    const appName = c.req.param('app');
+
+    // Path safety
+    if (appName.includes('..') || appName.includes('/') || appName.includes('\\')) {
+      return c.json({ error: 'Invalid name: must not contain "..", "/", or "\\"' }, 400);
+    }
+
+    const flowDir = join(cwd, '.ralph-flow', appName);
+    if (!existsSync(flowDir)) {
+      return c.json({ error: `App "${appName}" not found` }, 404);
+    }
+
+    // Load config for template name and loop structure
+    let config: RalphFlowConfig;
+    try {
+      config = loadConfig(flowDir);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Failed to load config: ${msg}` }, 500);
+    }
+
+    // Build timestamp: YYYY-MM-DD_HH-mm
+    const now = new Date();
+    const timestamp = now.toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+
+    // Create archive directory (with sequence suffix if same-minute collision)
+    const archivesBase = join(cwd, '.ralph-flow', '.archives', appName);
+    let archiveDir = join(archivesBase, timestamp);
+    let archiveTimestamp = timestamp;
+    if (existsSync(archiveDir)) {
+      let seq = 2;
+      while (existsSync(`${archiveDir}-${seq}`)) seq++;
+      archiveDir = `${archiveDir}-${seq}`;
+      archiveTimestamp = `${timestamp}-${seq}`;
+    }
+
+    try {
+      // Step 1: Copy entire app directory to archive
+      mkdirSync(archiveDir, { recursive: true });
+      cpSync(flowDir, archiveDir, { recursive: true });
+
+      // Step 2: Reset tracker and data files using template originals
+      let templateDir: string | undefined;
+      try {
+        templateDir = resolveTemplatePath(config.name);
+      } catch {
+        // Template not found — skip template-based reset
+      }
+
+      for (const loop of Object.values(config.loops)) {
+        // Reset tracker file
+        if (templateDir) {
+          const templateTracker = join(templateDir, 'loops', loop.tracker);
+          const appTracker = join(flowDir, loop.tracker);
+          if (existsSync(templateTracker)) {
+            writeFileSync(appTracker, readFileSync(templateTracker, 'utf-8'));
+          }
+        }
+
+        // Reset data files
+        if (loop.data_files && templateDir) {
+          for (const dataFile of loop.data_files) {
+            const templateData = join(templateDir, 'loops', dataFile);
+            const appData = join(flowDir, dataFile);
+            if (existsSync(templateData)) {
+              writeFileSync(appData, readFileSync(templateData, 'utf-8'));
+            }
+          }
+        }
+
+        // Clean up .agents/ directory
+        const loopDir = resolve(flowDir, loop.tracker, '..');
+        const agentsPath = join(loopDir, '.agents');
+        if (existsSync(agentsPath)) {
+          rmSync(agentsPath, { recursive: true, force: true });
+        }
+
+        // Clean up lock files
+        if (loop.lock) {
+          const lockPath = join(flowDir, loop.lock.file);
+          if (existsSync(lockPath)) {
+            rmSync(lockPath);
+          }
+        }
+      }
+
+      // Step 3: Delete DB rows
+      try {
+        const db = getDb(cwd);
+        deleteFlowState(db, appName);
+      } catch {
+        // DB cleanup is best-effort
+      }
+
+      // Step 4: Purge in-memory notifications for this app
+      for (let i = notifications.length - 1; i >= 0; i--) {
+        if (notifications[i].app === appName) {
+          notifications.splice(i, 1);
+        }
+      }
+
+      const archivePath = `.ralph-flow/.archives/${appName}/${archiveTimestamp}`;
+      return c.json({ ok: true, archivePath, timestamp: archiveTimestamp });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Archive failed: ${msg}` }, 500);
+    }
   });
 
   // GET /api/apps/:app/status — parsed tracker status for all loops
