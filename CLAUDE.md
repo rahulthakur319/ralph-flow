@@ -120,6 +120,9 @@ Same pattern in `template.ts` and `server.ts`.
 ### Hook Lifecycle (dashboard/server.ts)
 `startDashboard()` automatically installs the notification hook on startup and removes it on shutdown. SIGINT/SIGTERM signal handlers call `close()` for cleanup on Ctrl+C. A `process.on('exit')` fallback ensures hook removal even if another handler exits first. Hook errors are caught and logged as warnings — never crash the dashboard. This works identically via `dashboard`, `run --ui`, or `e2e --ui`.
 
+### Loop Context Environment Variables
+The runner sets `RALPHFLOW_APP` (flow directory basename, e.g. `code-implementation`) and `RALPHFLOW_LOOP` (config key, e.g. `tasks-loop`) on every spawned Claude session. The hook command includes these as query params (`?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP`) so notifications route to the correct loop in the dashboard. When Claude runs outside ralphflow, the vars are unset and the API defaults to `"unknown"`.
+
 ### Dashboard WebSocket Events
 - `status:full` — sent on connect and DB changes
 - `tracker:updated` — sent on tracker.md file change (debounced 300ms)
