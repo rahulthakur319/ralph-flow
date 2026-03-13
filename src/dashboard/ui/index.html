@@ -318,6 +318,12 @@
     border-color: var(--red);
   }
   .btn-danger:hover { background: rgba(248, 81, 73, 0.15); }
+  .btn-muted {
+    background: transparent;
+    color: var(--text-dim);
+    border-color: var(--border);
+  }
+  .btn-muted:hover { background: var(--bg-hover); color: var(--text); }
   .btn:disabled { opacity: 0.5; cursor: default; }
   .dirty-indicator {
     font-size: 11px;
@@ -1087,7 +1093,10 @@
           <h2>${esc(app.appName)}</h2>
           <span class="app-type-badge">${esc(app.appType)}</span>
         </div>
-        <button class="btn btn-danger" style="font-size:12px;padding:4px 10px" onclick="openDeleteAppModal('${esc(app.appName)}')">Delete</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-muted" style="font-size:12px;padding:4px 10px" onclick="openArchiveAppModal('${esc(app.appName)}')">Archive</button>
+          <button class="btn btn-danger" style="font-size:12px;padding:4px 10px" onclick="openDeleteAppModal('${esc(app.appName)}')">Delete</button>
+        </div>
       </div>
       ${app.description ? `<div class="app-desc">${esc(app.description)}</div>` : ''}
     </div>`;
@@ -1720,6 +1729,97 @@
       msgEl.innerHTML = '<div class="form-error">Network error — could not reach server</div>';
       deleteBtn.disabled = false;
       deleteBtn.textContent = 'Delete';
+    }
+  }
+
+  // Archive App Modal — exposed globally for inline onclick handlers
+  window.openArchiveAppModal = openArchiveAppModal;
+  function openArchiveAppModal(appName) {
+    const existing = document.querySelector('.modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Archive App</h3>
+          <button class="modal-close" data-action="close">&times;</button>
+        </div>
+        <div class="modal-body" id="archiveModalBody">
+          <p style="margin-bottom:12px">Archive <strong>${esc(appName)}</strong>?</p>
+          <p style="color:var(--text-dim);font-size:13px;margin-bottom:8px">This will snapshot all current work and reset to a clean slate:</p>
+          <ul style="color:var(--text-dim);font-size:13px;margin-left:18px;margin-bottom:12px;line-height:1.6">
+            <li>Stories, tasks, and trackers saved to <code style="font-family:var(--mono);font-size:12px;color:var(--text)">.archives/</code></li>
+            <li>Tracker and data files reset to template defaults</li>
+            <li>Prompts and config preserved</li>
+          </ul>
+          <div id="archiveModalMessage"></div>
+        </div>
+        <div class="modal-footer" id="archiveModalFooter">
+          <button class="btn" data-action="close">Cancel</button>
+          <button class="btn btn-primary" id="archiveModalBtn">Archive</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.dataset.action === 'close') {
+        overlay.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    });
+
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        overlay.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    overlay.querySelector('#archiveModalBtn').addEventListener('click', () => submitArchiveApp(overlay, appName));
+  }
+
+  async function submitArchiveApp(overlay, appName) {
+    const msgEl = overlay.querySelector('#archiveModalMessage');
+    const archiveBtn = overlay.querySelector('#archiveModalBtn');
+
+    archiveBtn.disabled = true;
+    archiveBtn.textContent = 'Archiving...';
+    msgEl.innerHTML = '';
+
+    try {
+      const res = await fetch('/api/apps/' + encodeURIComponent(appName) + '/archive', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        msgEl.innerHTML = `<div class="form-error">${esc(data.error || 'Failed to archive app')}</div>`;
+        archiveBtn.disabled = false;
+        archiveBtn.textContent = 'Archive';
+        return;
+      }
+
+      // Show success state
+      const body = overlay.querySelector('#archiveModalBody');
+      const footer = overlay.querySelector('#archiveModalFooter');
+
+      body.innerHTML = `
+        <p style="color:var(--green);margin-bottom:12px">Archived successfully.</p>
+        <p style="font-size:13px;color:var(--text-dim)">Snapshot saved to <code style="font-family:var(--mono);font-size:12px;color:var(--text)">${esc(data.archivePath)}</code></p>
+        <p style="font-size:13px;color:var(--text-dim);margin-top:8px">Timestamp: <strong style="color:var(--text)">${esc(data.timestamp)}</strong></p>
+      `;
+      footer.innerHTML = `<button class="btn btn-primary" data-action="close">Done</button>`;
+
+      // Clean up client state and refresh
+      notificationsList = notificationsList.filter(n => n.app !== appName);
+      fetchApps();
+    } catch (err) {
+      msgEl.innerHTML = '<div class="form-error">Network error — could not reach server</div>';
+      archiveBtn.disabled = false;
+      archiveBtn.textContent = 'Archive';
     }
   }
 
