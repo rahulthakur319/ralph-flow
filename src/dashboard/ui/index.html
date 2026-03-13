@@ -426,6 +426,40 @@
     border-bottom-color: var(--accent);
   }
 
+  /* Model selector */
+  .model-selector-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    padding: 4px 12px;
+  }
+  .model-selector-wrap label {
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .model-selector {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 8px;
+    cursor: pointer;
+    outline: none;
+  }
+  .model-selector:hover { border-color: var(--text-dim); }
+  .model-selector:focus { border-color: var(--accent); }
+  .model-save-ok {
+    font-size: 11px;
+    color: var(--green);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .model-save-ok.visible { opacity: 1; }
+
   /* Prompt mode toggle */
   .prompt-mode-toggle {
     display: flex;
@@ -1202,6 +1236,16 @@
           <button class="edit-tab${activeEditTab === 'prompt' ? ' active' : ''}" data-tab="prompt">Prompt</button>
           <button class="edit-tab${activeEditTab === 'tracker' ? ' active' : ''}" data-tab="tracker">Tracker</button>
           <button class="edit-tab${activeEditTab === 'config' ? ' active' : ''}" data-tab="config">Config</button>
+          <div class="model-selector-wrap">
+            <label>Model</label>
+            <select class="model-selector" id="modelSelector">
+              <option value="">Default</option>
+              <option value="claude-opus-4-6">claude-opus-4-6</option>
+              <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
+              <option value="claude-haiku-4-5-20251001">claude-haiku-4-5-20251001</option>
+            </select>
+            <span class="model-save-ok" id="modelSaveOk">Saved</span>
+          </div>
         </div>
         <div class="panel-body" id="editTabContent"></div>
       </div>`;
@@ -1240,6 +1284,7 @@
       });
       renderEditTabContent(app.appName, currentLoop.key);
       loadTracker(app.appName, currentLoop.key);
+      loadModelSelector(app.appName, currentLoop.key);
     }
   }
 
@@ -1503,6 +1548,43 @@
       viewer.textContent = data._rawYaml || JSON.stringify(data, null, 2);
     } catch {
       viewer.textContent = '(Error loading config)';
+    }
+  }
+
+  async function loadModelSelector(appName, loopKey) {
+    const selector = $('#modelSelector');
+    if (!selector) return;
+
+    try {
+      const data = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/config`);
+      const loopConfig = data.loops && data.loops[loopKey];
+      const currentModel = loopConfig && loopConfig.model ? loopConfig.model : '';
+      selector.value = currentModel;
+    } catch {
+      // Leave at default
+    }
+
+    selector.addEventListener('change', () => changeModel(appName, loopKey, selector.value));
+  }
+
+  async function changeModel(appName, loopKey, model) {
+    const saveOk = $('#modelSaveOk');
+    try {
+      await fetch(`/api/apps/${encodeURIComponent(appName)}/config/model`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loop: loopKey, model: model || null }),
+      });
+      if (saveOk) {
+        saveOk.classList.add('visible');
+        setTimeout(() => saveOk.classList.remove('visible'), 2000);
+      }
+      // Refresh config tab if it's currently visible
+      if (activeEditTab === 'config') {
+        loadEditConfig(appName);
+      }
+    } catch {
+      alert('Failed to update model');
     }
   }
 

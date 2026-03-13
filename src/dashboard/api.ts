@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { readFileSync, writeFileSync, readdirSync, existsSync, rmSync, cpSync, mkdirSync } from 'node:fs';
-import { join, resolve, basename } from 'node:path';
+import { readFileSync, writeFileSync, readdirSync, existsSync, rmSync, cpSync, mkdirSync, statSync } from 'node:fs';
+import { join, resolve, basename, relative } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -271,6 +271,91 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
       const msg = err instanceof Error ? err.message : String(err);
       return c.json({ error: `Archive failed: ${msg}` }, 500);
     }
+  });
+
+  // GET /api/apps/:app/archives — list all archive snapshots for an app
+  api.get('/api/apps/:app/archives', (c) => {
+    const appName = c.req.param('app');
+
+    // Path safety
+    if (appName.includes('..') || appName.includes('/') || appName.includes('\\')) {
+      return c.json({ error: 'Invalid name' }, 400);
+    }
+
+    const archivesDir = join(cwd, '.ralph-flow', '.archives', appName);
+    if (!existsSync(archivesDir)) {
+      return c.json([]);
+    }
+
+    const entries = readdirSync(archivesDir, { withFileTypes: true })
+      .filter(d => d.isDirectory())
+      .map(d => {
+        const archiveDir = join(archivesDir, d.name);
+        const summary = parseArchiveSummary(archiveDir);
+        const fileCount = countFiles(archiveDir);
+        return {
+          timestamp: d.name,
+          summary,
+          fileCount,
+        };
+      })
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp)); // newest first
+
+    return c.json(entries);
+  });
+
+  // GET /api/apps/:app/archives/:timestamp/files — list all files in an archive
+  api.get('/api/apps/:app/archives/:timestamp/files', (c) => {
+    const appName = c.req.param('app');
+    const timestamp = c.req.param('timestamp');
+
+    // Path safety
+    if (appName.includes('..') || appName.includes('/') || appName.includes('\\')) {
+      return c.json({ error: 'Invalid name' }, 400);
+    }
+    if (timestamp.includes('..') || timestamp.includes('/') || timestamp.includes('\\')) {
+      return c.json({ error: 'Invalid timestamp' }, 400);
+    }
+
+    const archiveDir = resolve(cwd, '.ralph-flow', '.archives', appName, timestamp);
+    if (!validatePath(archiveDir, cwd)) {
+      return c.json({ error: 'Invalid path' }, 403);
+    }
+    if (!existsSync(archiveDir)) {
+      return c.json({ error: 'Archive not found' }, 404);
+    }
+
+    const files = listFilesRecursive(archiveDir, archiveDir);
+    return c.json(files);
+  });
+
+  // GET /api/apps/:app/archives/:timestamp/files/* — read a specific archived file
+  api.get('/api/apps/:app/archives/:timestamp/files/*', (c) => {
+    const appName = c.req.param('app');
+    const timestamp = c.req.param('timestamp');
+    const filePath = c.req.path.replace(`/api/apps/${encodeURIComponent(appName)}/archives/${encodeURIComponent(timestamp)}/files/`, '');
+
+    // Path safety
+    if (appName.includes('..') || appName.includes('/') || appName.includes('\\')) {
+      return c.json({ error: 'Invalid name' }, 400);
+    }
+    if (timestamp.includes('..') || timestamp.includes('/') || timestamp.includes('\\')) {
+      return c.json({ error: 'Invalid timestamp' }, 400);
+    }
+    if (!filePath || filePath.includes('..')) {
+      return c.json({ error: 'Invalid file path' }, 400);
+    }
+
+    const fullPath = resolve(cwd, '.ralph-flow', '.archives', appName, timestamp, filePath);
+    if (!validatePath(fullPath, cwd)) {
+      return c.json({ error: 'Invalid path' }, 403);
+    }
+    if (!existsSync(fullPath) || statSync(fullPath).isDirectory()) {
+      return c.json({ error: 'File not found' }, 404);
+    }
+
+    const content = readFileSync(fullPath, 'utf-8');
+    return c.json({ path: filePath, content });
   });
 
   // GET /api/apps/:app/status — parsed tracker status for all loops
