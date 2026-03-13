@@ -659,6 +659,62 @@
     justify-content: flex-end;
     gap: 8px;
   }
+
+  /* Notification list in interactive panel */
+  .panel-interactive.has-notifs .panel-body {
+    display: block;
+    padding: 8px;
+    max-height: 240px;
+    overflow-y: auto;
+    color: var(--text);
+  }
+  .notif-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .notif-card:last-child { margin-bottom: 0; }
+  .notif-time {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .notif-msg {
+    flex: 1;
+    color: var(--text);
+    word-break: break-word;
+  }
+  .notif-dismiss {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .notif-dismiss:hover { color: var(--red); }
+
+  /* Sidebar notification badge */
+  .notif-badge {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 6px;
+    background: var(--accent);
+    color: #000;
+    font-weight: 600;
+  }
 </style>
 </head>
 <body>
@@ -699,6 +755,8 @@
   let reconnectDelay = 1000;
   let activeEditTab = 'prompt';
   let cachedPromptValue = null;
+  let notificationsList = [];
+  let notifPermissionRequested = false;
 
   // DOM refs
   const $ = (sel) => document.querySelector(sel);
@@ -780,6 +838,17 @@
         // Refresh status
         fetchAppStatus(event.app);
       }
+    } else if (event.type === 'notification:attention') {
+      const n = event.notification;
+      notificationsList.unshift(n);
+      renderSidebar();
+      renderContent();
+      maybeRequestNotifPermission();
+      showBrowserNotification(n);
+    } else if (event.type === 'notification:dismissed') {
+      notificationsList = notificationsList.filter(n => n.id !== event.id);
+      renderSidebar();
+      renderContent();
     }
   }
 
@@ -820,8 +889,10 @@
       if (app.loops) {
         for (const loop of app.loops) {
           const loopActive = appActive && selectedLoop === loop.key;
+          const loopNotifCount = notificationsList.filter(n => n.app === app.appName && n.loop === loop.key).length;
+          const badgeHtml = loopNotifCount > 0 ? ` <span class="notif-badge">${loopNotifCount}</span>` : '';
           html += `<div class="sidebar-item loop-item${loopActive ? ' active' : ''}" data-app="${esc(app.appName)}" data-loop="${esc(loop.key)}">
-            ${esc(loop.name)}
+            ${esc(loop.name)}${badgeHtml}
           </div>`;
         }
       }
@@ -915,13 +986,25 @@
       html += '<div class="panel-col-left">';
 
       // Interactive panel
-      html += `<div class="panel panel-interactive">
-        <div class="panel-header">Interactive</div>
-        <div class="panel-body">
-          <span class="bell-icon">&#128276;</span>
-          <span>No notifications</span>
-        </div>
-      </div>`;
+      const loopNotifs = notificationsList.filter(n => n.app === app.appName && n.loop === currentLoop.key);
+      const hasNotifs = loopNotifs.length > 0;
+      html += `<div class="panel panel-interactive${hasNotifs ? ' has-notifs' : ''}">
+        <div class="panel-header">Interactive${hasNotifs ? ' <span style="color:var(--accent)">(' + loopNotifs.length + ')</span>' : ''}</div>
+        <div class="panel-body">`;
+      if (hasNotifs) {
+        for (const n of loopNotifs) {
+          const time = new Date(n.timestamp).toLocaleTimeString();
+          const msg = extractNotifMessage(n.payload);
+          html += `<div class="notif-card" data-notif-id="${esc(n.id)}">
+            <span class="notif-time">${esc(time)}</span>
+            <span class="notif-msg">${esc(msg)}</span>
+            <button class="notif-dismiss" data-dismiss-id="${esc(n.id)}">&times;</button>
+          </div>`;
+        }
+      } else {
+        html += `<span class="bell-icon">&#128276;</span><span>No notifications</span>`;
+      }
+      html += '</div></div>';
 
       // Progress panel
       html += `<div class="panel panel-progress">
@@ -974,6 +1057,11 @@
     // Bind pipeline node clicks
     content.querySelectorAll('.pipeline-node').forEach(el => {
       el.addEventListener('click', () => selectLoop(el.dataset.loop));
+    });
+
+    // Bind notification dismiss buttons
+    content.querySelectorAll('.notif-dismiss').forEach(btn => {
+      btn.addEventListener('click', () => dismissNotification(btn.dataset.dismissId));
     });
 
     // Bind edit tabs + load content
@@ -1221,6 +1309,51 @@
     return d.innerHTML;
   }
 
+  // Notifications
+  async function fetchNotifications() {
+    try {
+      const data = await fetchJson('/api/notifications');
+      notificationsList = Array.isArray(data) ? data : [];
+      renderSidebar();
+      renderContent();
+    } catch { /* ignore */ }
+  }
+
+  async function dismissNotification(id) {
+    try {
+      await fetch(`/api/notification/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      notificationsList = notificationsList.filter(n => n.id !== id);
+      renderSidebar();
+      renderContent();
+    } catch { /* ignore */ }
+  }
+
+  function extractNotifMessage(payload) {
+    if (!payload) return 'Attention needed';
+    if (typeof payload === 'string') return payload;
+    if (payload.message) return payload.message;
+    if (payload.type) return payload.type;
+    if (payload.event) return payload.event;
+    return 'Attention needed';
+  }
+
+  function maybeRequestNotifPermission() {
+    if (notifPermissionRequested) return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      notifPermissionRequested = true;
+      Notification.requestPermission();
+    }
+  }
+
+  function showBrowserNotification(n) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (document.hasFocus()) return;
+    const msg = extractNotifMessage(n.payload);
+    new Notification('RalphFlow — ' + (n.loop || 'Notification'), { body: msg });
+  }
+
   // Create App Modal
   function openCreateAppModal() {
     // Remove any existing modal
@@ -1379,6 +1512,7 @@
 
   // Init
   fetchApps();
+  fetchNotifications();
   connectWs();
 })();
 </script>
