@@ -7,14 +7,8 @@ import {
   createEmptyLoop,
   initTemplateBuilderState,
   renderPromptConfigForm,
-  renderPromptBuilderHTML,
-  highlightVariables,
-  assemblePromptFromBlocks,
-  PROMPT_BLOCK_TYPES,
   PROMPT_CAPABILITIES,
   bindPromptConfigFormEvents,
-  bindPromptBuilderEvents,
-  capturePromptBuilderInputs,
   capturePromptConfigFormInputs,
 } from './prompt-builder.js';
 
@@ -238,13 +232,10 @@ export function renderTemplateBuilder() {
 
     if (showForm) {
       html += renderPromptConfigForm(si, loop, tbs.loops);
-    } else if (loop.useBuilder) {
-      html += renderPromptBuilderHTML(si, loop);
     } else {
       html += `<textarea class="prompt-textarea" data-prompt-idx="${si}" placeholder="Add your prompt here...">${esc(loop.prompt)}</textarea>`;
       html += `<div class="prompt-builder-toolbar">`;
       html += `<button class="btn btn-muted" data-show-prompt-form="${si}" style="font-size:11px;padding:4px 10px">Regenerate</button>`;
-      html += `<button class="btn btn-muted" data-use-builder="${si}" style="font-size:11px;padding:4px 10px">Use Builder</button>`;
       html += `</div>`;
     }
     html += '</div>';
@@ -482,9 +473,6 @@ function bindTemplateBuilderEvents() {
 
   // Prompt config form events
   bindPromptConfigFormEvents();
-
-  // Prompt builder events
-  bindPromptBuilderEvents();
 }
 
 function setupBuilderDragAndDrop() {
@@ -593,9 +581,6 @@ export function captureBuilderInputs() {
 
   // Capture prompt config form inputs
   capturePromptConfigFormInputs();
-
-  // Capture prompt builder block contents
-  capturePromptBuilderInputs();
 }
 
 export function updateYamlPreview() {
@@ -764,13 +749,6 @@ async function saveTemplate() {
     }
   }
 
-  // Assemble blocks into prompt for any loops still in builder mode
-  tbs.loops.forEach(loop => {
-    if (loop.useBuilder && loop.blocks.length > 0) {
-      loop.prompt = assemblePromptFromBlocks(loop.blocks);
-    }
-  });
-
   const definition = {
     name: tbs.name.trim(),
     description: tbs.description.trim(),
@@ -868,8 +846,6 @@ async function loadTemplateForEdit(templateName) {
         showOptional: false,
         showPrompt: false,
         prompt: '',
-        useBuilder: false,
-        blocks: [],
         inputFiles: (loop.fed_by || []).join(', '),
         outputFiles: (loop.feeds || []).join(', '),
         stageConfigs: [],
