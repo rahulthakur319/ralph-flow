@@ -11,6 +11,7 @@ import {
   highlightVariables,
   assemblePromptFromBlocks,
   PROMPT_BLOCK_TYPES,
+  PROMPT_CAPABILITIES,
   bindPromptConfigFormEvents,
   bindPromptBuilderEvents,
   capturePromptBuilderInputs,
@@ -95,6 +96,7 @@ export function renderTemplateBuilder() {
   html += '<div class="templates-header">';
   html += `<div style="display:flex;align-items:center;gap:12px"><button class="btn btn-muted" id="builderBackBtn" style="padding:4px 10px">&larr; Back</button><h2>${state.editingTemplateName ? 'Edit Template' : 'Create Template'}</h2></div>`;
   html += '</div>';
+  html += '<div style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.5">A template defines a multi-step pipeline where each loop processes data through defined stages. Loops are connected via input/output files &mdash; one loop\'s output becomes the next loop\'s input. Each loop runs an AI agent that cycles through its stages until the completion string is detected.</div>';
 
   html += '<div class="template-builder">';
 
@@ -104,10 +106,10 @@ export function renderTemplateBuilder() {
   // Basic info
   html += '<div class="builder-section">';
   html += '<div class="builder-section-title">Basic Info</div>';
-  html += `<div class="form-group"><label class="form-label">Template Name</label>
+  html += `<div class="form-group"><label class="form-label">Template Name <span class="form-hint">Unique identifier for this pipeline</span></label>
     <input class="form-input" id="tplName" type="text" value="${esc(tbs.name)}" placeholder="my-pipeline" autocomplete="off"></div>`;
-  html += `<div class="form-group"><label class="form-label">Description</label>
-    <input class="form-input" id="tplDesc" type="text" value="${esc(tbs.description)}" placeholder="Pipeline description" autocomplete="off"></div>`;
+  html += `<div class="form-group"><label class="form-label">Description <span class="form-hint">What does this pipeline accomplish?</span></label>
+    <input class="form-input" id="tplDesc" type="text" value="${esc(tbs.description)}" placeholder="e.g. Break down stories into tasks and implement them" autocomplete="off"></div>`;
   html += '</div>';
 
   // Pipeline minimap (doubles as loop selector)
@@ -147,10 +149,10 @@ export function renderTemplateBuilder() {
   html += '<button class="builder-minimap-add" id="minimapAddBtn" title="Add loop">+</button>';
   html += '</div></div>';
 
-  // YAML Preview
+  // YAML Preview (collapsed by default)
   html += '<div class="builder-section yaml-preview-section">';
-  html += '<div class="builder-section-title">YAML Preview</div>';
-  html += `<pre class="yaml-preview" id="yamlPreview">${esc(generateYamlPreview(tbs))}</pre>`;
+  html += `<button class="yaml-toggle" id="yamlToggleBtn"><span class="yaml-toggle-icon">&rsaquo;</span> YAML Preview</button>`;
+  html += `<pre class="yaml-preview" id="yamlPreview" style="display:none">${esc(generateYamlPreview(tbs))}</pre>`;
   html += '</div>';
 
   html += '</div>'; // close builder-col-overview
@@ -159,6 +161,7 @@ export function renderTemplateBuilder() {
   html += '<div class="builder-col-config">';
 
   if (loop) {
+    syncStageConfigs(loop);
     html += '<div class="builder-section">';
     html += `<div class="builder-section-title" style="display:flex;align-items:center;justify-content:space-between">
       <span>Loop ${si + 1}: ${esc(loop.name || 'Untitled')}</span>
@@ -169,68 +172,50 @@ export function renderTemplateBuilder() {
     html += '<div class="loop-card-grid">';
 
     // Name
-    html += `<div class="form-group"><label class="form-label">Name</label>
+    html += `<div class="form-group"><label class="form-label">Name <span class="form-hint">e.g. Story, Tasks, Test</span></label>
       <input class="form-input loop-input" data-loop-idx="${si}" data-field="name" type="text" value="${esc(loop.name)}" placeholder="Story" autocomplete="off"></div>`;
 
     // Model
-    html += `<div class="form-group"><label class="form-label">Model</label>
+    html += `<div class="form-group"><label class="form-label">Model <span class="form-hint">AI model for this loop</span></label>
       <select class="form-select loop-input" data-loop-idx="${si}" data-field="model">
         <option value="claude-sonnet-4-6"${loop.model === 'claude-sonnet-4-6' ? ' selected' : ''}>claude-sonnet-4-6</option>
         <option value="claude-opus-4-6"${loop.model === 'claude-opus-4-6' ? ' selected' : ''}>claude-opus-4-6</option>
         <option value="claude-haiku-4-5-20251001"${loop.model === 'claude-haiku-4-5-20251001' ? ' selected' : ''}>claude-haiku-4-5-20251001</option>
       </select></div>`;
 
-    // Stages (tag input)
-    html += `<div class="form-group loop-card-full"><label class="form-label">Stages</label>
-      <div class="stage-tags" data-loop-idx="${si}">`;
-    loop.stages.forEach((stage, sti) => {
-      html += `<span class="stage-tag">${esc(stage)}<button class="stage-tag-remove" data-loop-idx="${si}" data-stage-idx="${sti}">&times;</button></span>`;
-    });
-    html += `<input type="text" placeholder="Type stage, press Enter" data-stage-input="${si}" autocomplete="off">`;
-    html += '</div></div>';
+    // Input files
+    const prevLoop = si > 0 ? tbs.loops[si - 1] : null;
+    const suggestedInput = prevLoop ? (prevLoop.outputFiles || '').trim() : '';
+    html += `<div class="form-group"><label class="form-label">Input Files <span class="form-hint">Files this loop reads from</span></label>
+      <input class="form-input loop-input" data-loop-idx="${si}" data-field="inputFiles" type="text" value="${esc(loop.inputFiles || '')}" placeholder="${suggestedInput ? esc(suggestedInput) : 'e.g. stories.md'}" autocomplete="off"></div>`;
 
-    // Completion
-    html += `<div class="form-group loop-card-full"><label class="form-label">Completion String</label>
-      <input class="form-input loop-input" data-loop-idx="${si}" data-field="completion" type="text" value="${esc(loop.completion)}" placeholder="LOOP COMPLETE" autocomplete="off"></div>`;
+    // Output files
+    const outputPlaceholder = loop.name ? loop.name.toLowerCase().replace(/\s+/g, '-') + '.md' : 'e.g. tasks.md';
+    html += `<div class="form-group"><label class="form-label">Output Files <span class="form-hint">Files this loop writes to</span></label>
+      <input class="form-input loop-input" data-loop-idx="${si}" data-field="outputFiles" type="text" value="${esc(loop.outputFiles || '')}" placeholder="${esc(outputPlaceholder)}" autocomplete="off"></div>`;
+
+    // Completion string
+    html += `<div class="form-group loop-card-full"><label class="form-label">Completion String <span class="form-hint">Signal that this loop is done</span></label>
+      <input class="form-input loop-input" data-loop-idx="${si}" data-field="completion" type="text" value="${esc(loop.completion)}" placeholder="LOOP COMPLETE" autocomplete="off">
+      <div class="form-field-note">When this string appears in the tracker, the process is automatically stopped via <code>kill -INT $PPID</code></div></div>`;
 
     html += '</div>'; // close loop-card-grid
 
-    // Multi-agent toggle
-    html += `<div style="margin-top:12px">
-      <label class="toggle-wrap">
-        <input type="checkbox" class="toggle-input" data-loop-idx="${si}" data-field="multi_agent" ${loop.multi_agent ? 'checked' : ''}>
-        <span class="toggle-label">Multi-agent</span>
-      </label>`;
-
-    if (loop.multi_agent) {
-      html += `<div class="multi-agent-fields">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-          <div class="form-group" style="margin-bottom:0"><label class="form-label">Max Agents</label>
-            <input class="form-input loop-input" data-loop-idx="${si}" data-field="max_agents" type="number" value="${loop.max_agents}" min="2" max="10"></div>
-          <div class="form-group" style="margin-bottom:0"><label class="form-label">Strategy</label>
-            <select class="form-select loop-input" data-loop-idx="${si}" data-field="strategy">
-              <option value="parallel"${loop.strategy === 'parallel' ? ' selected' : ''}>parallel</option>
-              <option value="sequential"${loop.strategy === 'sequential' ? ' selected' : ''}>sequential</option>
-            </select></div>
-          <div class="form-group" style="margin-bottom:0"><label class="form-label">Agent Placeholder</label>
-            <input class="form-input loop-input" data-loop-idx="${si}" data-field="agent_placeholder" type="text" value="${esc(loop.agent_placeholder)}"></div>
-        </div>
-      </div>`;
-    }
+    // Stages section — each stage gets its own card
+    html += '<div class="stages-section">';
+    html += '<label class="form-label">Stages <span class="form-hint">Define the steps this loop cycles through on each iteration</span></label>';
+    loop.stageConfigs.forEach((sc, sci) => {
+      html += `<div class="stage-config-card">`;
+      html += `<div class="stage-card-header">`;
+      html += `<span class="stage-card-number">${sci + 1}</span>`;
+      html += `<input class="form-input stage-name-input" data-loop-idx="${si}" data-stage-idx="${sci}" value="${esc(sc.name)}" placeholder="Stage name" autocomplete="off">`;
+      html += `<button class="stage-card-remove" data-loop-idx="${si}" data-stage-idx="${sci}" title="Remove stage">&times;</button>`;
+      html += `</div>`;
+      html += `<textarea class="form-input stage-desc-input" data-loop-idx="${si}" data-stage-idx="${sci}" placeholder="What should this stage do? e.g. Read input files, explore codebase, identify scope...">${esc(sc.description)}</textarea>`;
+      html += `</div>`;
+    });
+    html += `<button class="btn btn-muted add-stage-btn" data-add-stage="${si}">+ Add Stage</button>`;
     html += '</div>';
-
-    // Optional fields toggle
-    html += `<button class="optional-toggle" data-toggle-optional="${si}">${loop.showOptional ? 'Hide optional fields' : 'Show optional fields'}</button>`;
-
-    if (loop.showOptional) {
-      html += '<div class="optional-fields">';
-      html += '<div class="loop-card-grid">';
-      html += `<div class="form-group"><label class="form-label">Data Files <span style="color:var(--text-muted)">(comma-separated)</span></label>
-        <input class="form-input loop-input" data-loop-idx="${si}" data-field="data_files" type="text" value="${esc((loop.data_files || []).join(', '))}" placeholder="stories.md, tasks.md" autocomplete="off"></div>`;
-      html += `<div class="form-group"><label class="form-label">Entities <span style="color:var(--text-muted)">(comma-separated)</span></label>
-        <input class="form-input loop-input" data-loop-idx="${si}" data-field="entities" type="text" value="${esc((loop.entities || []).join(', '))}" placeholder="STORY, TASK" autocomplete="off"></div>`;
-      html += '</div></div>';
-    }
 
     html += '</div>'; // close loop-card
     html += '</div>'; // close builder-section
@@ -242,8 +227,6 @@ export function renderTemplateBuilder() {
   html += '<div class="builder-col-prompt">';
 
   if (loop) {
-    // Sync stage configs with current stages
-    syncStageConfigs(loop);
     const showForm = loop.showPromptForm && !loop.prompt.trim();
 
     html += '<div class="builder-section">';
@@ -322,64 +305,107 @@ function bindTemplateBuilderEvents() {
     const field = input.dataset.field;
     const evtType = input.tagName === 'SELECT' ? 'change' : 'input';
 
-    if (field === 'multi_agent') {
-      input.addEventListener('change', () => {
-        captureBuilderInputs();
-        state.templateBuilderState.loops[idx].multi_agent = input.checked;
-        renderTemplateBuilder();
-      });
-      return;
-    }
-
     input.addEventListener(evtType, () => {
       const loop = state.templateBuilderState.loops[idx];
       if (!loop) return;
-      if (field === 'max_agents') {
-        loop.max_agents = parseInt(input.value) || 3;
-      } else if (field === 'data_files') {
-        loop.data_files = input.value.split(',').map(s => s.trim()).filter(Boolean);
-      } else if (field === 'entities') {
-        loop.entities = input.value.split(',').map(s => s.trim()).filter(Boolean);
-      } else {
-        loop[field] = input.value;
-      }
+      loop[field] = input.value;
       // Live-update minimap label when loop name changes
       if (field === 'name') {
         const minimapNode = dom.content.querySelector(`.builder-minimap-node[data-minimap-idx="${idx}"] .minimap-label`);
         if (minimapNode) minimapNode.textContent = input.value || `Loop ${idx + 1}`;
+        // Auto-populate output file from loop name
+        if (loop._outputAutoFilled !== false) {
+          const autoOut = input.value ? input.value.toLowerCase().replace(/\s+/g, '-') + '.md' : '';
+          loop.outputFiles = autoOut;
+          const outEl = dom.content.querySelector(`.loop-input[data-loop-idx="${idx}"][data-field="outputFiles"]`);
+          if (outEl) outEl.value = autoOut;
+          // Cascade to next loop's input
+          if (idx < state.templateBuilderState.loops.length - 1) {
+            const nextLoop = state.templateBuilderState.loops[idx + 1];
+            if (nextLoop._inputAutoFilled !== false) {
+              nextLoop.inputFiles = autoOut;
+              const nextEl = dom.content.querySelector(`.loop-input[data-loop-idx="${idx + 1}"][data-field="inputFiles"]`);
+              if (nextEl) nextEl.value = autoOut;
+            }
+          }
+          updateMinimapIO();
+        }
+      }
+      if (field === 'outputFiles') {
+        loop._outputAutoFilled = false;
+        // Auto-populate next loop's input if not manually edited
+        if (idx < state.templateBuilderState.loops.length - 1) {
+          const nextLoop = state.templateBuilderState.loops[idx + 1];
+          if (nextLoop._inputAutoFilled !== false) {
+            nextLoop.inputFiles = input.value;
+            const nextEl = dom.content.querySelector(`.loop-input[data-loop-idx="${idx + 1}"][data-field="inputFiles"]`);
+            if (nextEl) nextEl.value = input.value;
+          }
+        }
+        updateMinimapIO();
+      }
+      if (field === 'inputFiles') {
+        loop._inputAutoFilled = false;
+        updateMinimapIO();
       }
       updateYamlPreview();
     });
   });
 
-  // Stage tag inputs
-  dom.content.querySelectorAll('[data-stage-input]').forEach(input => {
-    const idx = parseInt(input.dataset.stageInput);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ',') {
-        e.preventDefault();
-        const value = input.value.trim().replace(/,/g, '');
-        if (value && !state.templateBuilderState.loops[idx].stages.includes(value)) {
-          captureBuilderInputs();
-          state.templateBuilderState.loops[idx].stages.push(value);
-          renderTemplateBuilder();
-          setTimeout(() => {
-            const newInput = dom.content.querySelector(`[data-stage-input="${idx}"]`);
-            if (newInput) newInput.focus();
-          }, 0);
-        }
+  // Stage name inputs
+  dom.content.querySelectorAll('.stage-name-input').forEach(input => {
+    input.addEventListener('input', () => {
+      const loopIdx = parseInt(input.dataset.loopIdx);
+      const stageIdx = parseInt(input.dataset.stageIdx);
+      const loop = state.templateBuilderState.loops[loopIdx];
+      if (loop) {
+        if (loop.stageConfigs[stageIdx]) loop.stageConfigs[stageIdx].name = input.value;
+        if (loop.stages[stageIdx] !== undefined) loop.stages[stageIdx] = input.value;
+        updateYamlPreview();
       }
     });
   });
 
-  // Stage tag remove buttons
-  dom.content.querySelectorAll('.stage-tag-remove').forEach(btn => {
+  // Stage description textareas
+  dom.content.querySelectorAll('.stage-desc-input').forEach(textarea => {
+    textarea.addEventListener('input', () => {
+      const loopIdx = parseInt(textarea.dataset.loopIdx);
+      const stageIdx = parseInt(textarea.dataset.stageIdx);
+      const loop = state.templateBuilderState.loops[loopIdx];
+      if (loop && loop.stageConfigs[stageIdx]) {
+        loop.stageConfigs[stageIdx].description = textarea.value;
+      }
+    });
+  });
+
+  // Stage card remove buttons
+  dom.content.querySelectorAll('.stage-card-remove').forEach(btn => {
     btn.addEventListener('click', () => {
       captureBuilderInputs();
       const loopIdx = parseInt(btn.dataset.loopIdx);
       const stageIdx = parseInt(btn.dataset.stageIdx);
-      state.templateBuilderState.loops[loopIdx].stages.splice(stageIdx, 1);
-      renderTemplateBuilder();
+      const loop = state.templateBuilderState.loops[loopIdx];
+      if (loop) {
+        loop.stages.splice(stageIdx, 1);
+        loop.stageConfigs.splice(stageIdx, 1);
+        renderTemplateBuilder();
+      }
+    });
+  });
+
+  // Add stage button
+  dom.content.querySelectorAll('.add-stage-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      captureBuilderInputs();
+      const loopIdx = parseInt(btn.dataset.addStage);
+      const loop = state.templateBuilderState.loops[loopIdx];
+      if (loop) {
+        const caps = {};
+        PROMPT_CAPABILITIES.forEach(c => { caps[c.id] = false; });
+        loop.stages.push('');
+        loop.stageConfigs.push({ name: '', description: '', capabilities: caps });
+        renderTemplateBuilder();
+      }
     });
   });
 
@@ -398,15 +424,19 @@ function bindTemplateBuilderEvents() {
     });
   });
 
-  // Optional fields toggle
-  dom.content.querySelectorAll('[data-toggle-optional]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      captureBuilderInputs();
-      const idx = parseInt(btn.dataset.toggleOptional);
-      state.templateBuilderState.loops[idx].showOptional = !state.templateBuilderState.loops[idx].showOptional;
-      renderTemplateBuilder();
+  // YAML preview toggle
+  const yamlToggle = document.getElementById('yamlToggleBtn');
+  if (yamlToggle) {
+    yamlToggle.addEventListener('click', () => {
+      const preview = document.getElementById('yamlPreview');
+      const icon = yamlToggle.querySelector('.yaml-toggle-icon');
+      if (preview) {
+        const visible = preview.style.display !== 'none';
+        preview.style.display = visible ? 'none' : 'block';
+        if (icon) icon.textContent = visible ? '\u203A' : '\u2304';
+      }
     });
-  });
+  }
 
   // Prompt textarea input
   dom.content.querySelectorAll('.prompt-textarea').forEach(textarea => {
@@ -432,8 +462,17 @@ function bindTemplateBuilderEvents() {
   if (minimapAddBtn) {
     minimapAddBtn.addEventListener('click', () => {
       captureBuilderInputs();
-      state.templateBuilderState.loops.push(createEmptyLoop());
-      state.selectedBuilderLoop = state.templateBuilderState.loops.length - 1;
+      const loops = state.templateBuilderState.loops;
+      const newLoop = createEmptyLoop();
+      // Auto-fill input from previous loop's output
+      if (loops.length > 0) {
+        const prevOutput = (loops[loops.length - 1].outputFiles || '').trim();
+        if (prevOutput) {
+          newLoop.inputFiles = prevOutput;
+        }
+      }
+      loops.push(newLoop);
+      state.selectedBuilderLoop = loops.length - 1;
       renderTemplateBuilder();
     });
   }
@@ -521,15 +560,26 @@ export function captureBuilderInputs() {
     const idx = parseInt(input.dataset.loopIdx);
     const field = input.dataset.field;
     const loop = tbs.loops[idx];
-    if (!loop || field === 'multi_agent') return;
-    if (field === 'max_agents') {
-      loop.max_agents = parseInt(input.value) || 3;
-    } else if (field === 'data_files') {
-      loop.data_files = input.value.split(',').map(s => s.trim()).filter(Boolean);
-    } else if (field === 'entities') {
-      loop.entities = input.value.split(',').map(s => s.trim()).filter(Boolean);
-    } else {
-      loop[field] = input.value;
+    if (!loop) return;
+    loop[field] = input.value;
+  });
+
+  // Capture stage card inputs
+  dom.content.querySelectorAll('.stage-name-input').forEach(input => {
+    const loopIdx = parseInt(input.dataset.loopIdx);
+    const stageIdx = parseInt(input.dataset.stageIdx);
+    const loop = tbs.loops[loopIdx];
+    if (loop) {
+      if (loop.stageConfigs[stageIdx]) loop.stageConfigs[stageIdx].name = input.value;
+      if (loop.stages[stageIdx] !== undefined) loop.stages[stageIdx] = input.value;
+    }
+  });
+  dom.content.querySelectorAll('.stage-desc-input').forEach(textarea => {
+    const loopIdx = parseInt(textarea.dataset.loopIdx);
+    const stageIdx = parseInt(textarea.dataset.stageIdx);
+    const loop = tbs.loops[loopIdx];
+    if (loop && loop.stageConfigs[stageIdx]) {
+      loop.stageConfigs[stageIdx].description = textarea.value;
     }
   });
 
@@ -670,33 +720,10 @@ function generateYamlPreview(tbs) {
     yaml += `    stages: [${loop.stages.join(', ')}]\n`;
     yaml += `    completion: "${loop.completion || 'LOOP COMPLETE'}"\n`;
 
-    if (loop.multi_agent) {
-      yaml += `    multi_agent:\n`;
-      yaml += `      enabled: true\n`;
-      yaml += `      max_agents: ${loop.max_agents || 3}\n`;
-      yaml += `      strategy: ${loop.strategy || 'parallel'}\n`;
-      yaml += `      agent_placeholder: "${loop.agent_placeholder || '{{AGENT_NAME}}'}"\n`;
-      yaml += `    lock:\n`;
-      yaml += `      file: ${loopDirName}/.tracker-lock\n`;
-      yaml += `      type: echo\n`;
-      yaml += `      stale_seconds: 60\n`;
-      yaml += `    worktree:\n`;
-      yaml += `      strategy: shared\n`;
-      yaml += `      auto_merge: true\n`;
-    } else {
-      yaml += `    multi_agent: false\n`;
-    }
-
+    yaml += `    multi_agent: false\n`;
     yaml += `    model: ${loop.model || 'claude-sonnet-4-6'}\n`;
     yaml += `    cadence: 0\n`;
 
-    if (loop.data_files && loop.data_files.length > 0) {
-      yaml += `    data_files:\n`;
-      loop.data_files.forEach(f => { yaml += `      - ${loopDirName}/${f}\n`; });
-    }
-    if (loop.entities && loop.entities.length > 0) {
-      yaml += `    entities: [${loop.entities.join(', ')}]\n`;
-    }
     const ioFedBy = (loop.inputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
     const ioFeeds = (loop.outputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
     if (ioFedBy.length > 0) {
@@ -754,20 +781,6 @@ async function saveTemplate() {
         completion: loop.completion.trim(),
         model: loop.model || undefined,
       };
-      if (loop.multi_agent) {
-        loopDef.multi_agent = {
-          enabled: true,
-          max_agents: loop.max_agents || 3,
-          strategy: loop.strategy || 'parallel',
-          agent_placeholder: loop.agent_placeholder || '{{AGENT_NAME}}'
-        };
-      }
-      if (loop.data_files && loop.data_files.length > 0) {
-        loopDef.data_files = loop.data_files;
-      }
-      if (loop.entities && loop.entities.length > 0) {
-        loopDef.entities = loop.entities;
-      }
       const fedByList = (loop.inputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
       const feedsList = (loop.outputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
       if (fedByList.length > 0) {
@@ -841,22 +854,18 @@ async function loadTemplateForEdit(templateName) {
 
     const loops = [];
     for (const [loopKey, loop] of sortedLoops) {
-      const isMultiAgent = loop.multi_agent && typeof loop.multi_agent === 'object' && loop.multi_agent.enabled;
-      // Strip directory prefix from data_files (e.g. "00-story-loop/stories.md" → "stories.md")
-      const dataFiles = (loop.data_files || []).map(f => f.includes('/') ? f.split('/').pop() : f);
-
       const loopState = {
         name: loop.name || '',
         model: loop.model || 'claude-sonnet-4-6',
         stages: loop.stages || [],
         completion: loop.completion || '',
-        multi_agent: !!isMultiAgent,
-        max_agents: isMultiAgent ? loop.multi_agent.max_agents : 3,
-        strategy: isMultiAgent ? loop.multi_agent.strategy : 'parallel',
-        agent_placeholder: isMultiAgent ? loop.multi_agent.agent_placeholder : '{{AGENT_NAME}}',
-        data_files: dataFiles,
-        entities: loop.entities || [],
-        showOptional: dataFiles.length > 0 || (loop.entities && loop.entities.length > 0),
+        multi_agent: false,
+        max_agents: 3,
+        strategy: 'parallel',
+        agent_placeholder: '{{AGENT_NAME}}',
+        data_files: [],
+        entities: [],
+        showOptional: false,
         showPrompt: false,
         prompt: '',
         useBuilder: false,
@@ -864,7 +873,9 @@ async function loadTemplateForEdit(templateName) {
         inputFiles: (loop.fed_by || []).join(', '),
         outputFiles: (loop.feeds || []).join(', '),
         stageConfigs: [],
-        showPromptForm: false
+        showPromptForm: false,
+        _outputAutoFilled: false,
+        _inputAutoFilled: false
       };
 
       // Load prompt content

@@ -1427,6 +1427,112 @@ body {
   margin-top: 8px;
 }
 .optional-toggle:hover { text-decoration: underline; }
+/* Stage cards in builder */
+.stages-section {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.stage-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.stage-card-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(88,166,255,0.1);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.stage-card-header .stage-name-input {
+  flex: 1;
+  font-weight: 500;
+}
+.stage-card-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.stage-card-remove:hover { color: var(--red); }
+.stage-desc-input {
+  min-height: 48px;
+  resize: vertical;
+  font-size: 12px !important;
+  line-height: 1.5;
+}
+.add-stage-btn {
+  font-size: 12px;
+  padding: 8px 0;
+  width: 100%;
+  border-style: dashed !important;
+  margin-top: 4px;
+}
+/* Form hints and field notes */
+.form-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 4px;
+}
+.form-field-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.form-field-note code {
+  font-size: 10px;
+  background: var(--bg-active);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--mono);
+}
+/* YAML preview toggle */
+.yaml-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 8px;
+}
+.yaml-toggle:hover { color: var(--text); }
+.yaml-toggle-icon {
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: 16px;
+}
+/* Prompt generate card */
+.prompt-generate-card {
+  text-align: center;
+  padding: 24px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.prompt-generate-info {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
 .optional-fields {
   margin-top: 12px;
   padding-top: 12px;
@@ -1808,7 +1914,13 @@ body {
 .builder-minimap-connector-line {
   width: 100%;
   height: 2px;
-  background: var(--border);
+  background: repeating-linear-gradient(90deg, var(--text-muted) 0, var(--text-muted) 4px, transparent 4px, transparent 8px);
+  background-size: 16px 2px;
+  animation: connector-flow 1s linear infinite;
+}
+@keyframes connector-flow {
+  0% { background-position: 0 0; }
+  100% { background-position: 16px 0; }
 }
 .builder-minimap-connector-file {
   font-size: 9px;
@@ -1826,19 +1938,22 @@ body {
   max-width: 100px;
 }
 .minimap-io-label {
-  font-size: 9px;
-  color: var(--text-muted);
+  font-size: 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 80px;
   line-height: 1;
+  font-weight: 500;
 }
+.minimap-io-in .minimap-io-label { color: var(--blue); }
+.minimap-io-out .minimap-io-label { color: var(--green); }
 .minimap-io-arrow {
-  font-size: 8px;
-  color: var(--text-dim);
+  font-size: 9px;
   flex-shrink: 0;
 }
+.minimap-io-in .minimap-io-arrow { color: var(--blue); }
+.minimap-io-out .minimap-io-arrow { color: var(--green); }
 .builder-minimap-add {
   display: flex;
   align-items: center;

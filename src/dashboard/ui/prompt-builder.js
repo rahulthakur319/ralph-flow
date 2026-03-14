@@ -176,7 +176,7 @@ export function assemblePromptFromBlocks(blocks) {
 export function createEmptyLoop() {
   return {
     name: '',
-    stages: ['init'],
+    stages: [],
     completion: 'LOOP COMPLETE',
     model: 'claude-sonnet-4-6',
     multi_agent: false,
@@ -193,7 +193,9 @@ export function createEmptyLoop() {
     inputFiles: '',
     outputFiles: '',
     stageConfigs: [],
-    showPromptForm: true
+    showPromptForm: true,
+    _outputAutoFilled: true,
+    _inputAutoFilled: true
   };
 }
 
@@ -207,70 +209,10 @@ export function initTemplateBuilderState() {
 
 export function renderPromptConfigForm(loopIdx, loop, allLoops) {
   let html = '<div class="prompt-config-form" data-config-form-idx="' + loopIdx + '">';
-
-  // Check for previous loop's output files as suggestion
-  let inputSuggestion = '';
-  if (loopIdx > 0 && allLoops && allLoops[loopIdx - 1]) {
-    inputSuggestion = (allLoops[loopIdx - 1].outputFiles || '').trim();
-  }
-
-  // Per-loop settings
-  html += '<div class="prompt-config-section">';
-  html += '<div class="prompt-config-section-title">Loop Settings</div>';
-  html += '<div class="prompt-config-grid">';
-  html += `<div class="form-group"><label class="form-label">Input Files</label>
-    <input class="form-input" data-pcf-field="inputFiles" data-pcf-idx="${loopIdx}" type="text" value="${esc(loop.inputFiles || '')}" placeholder="${inputSuggestion ? esc(inputSuggestion) : 'stories.md, research.md'}" autocomplete="off">`;
-  if (inputSuggestion && !(loop.inputFiles || '').trim()) {
-    html += `<div class="io-file-suggestion" data-suggest-input="${loopIdx}" style="font-size:11px;color:var(--text-muted);margin-top:4px;cursor:pointer">Use previous loop output: <span style="color:var(--accent)">${esc(inputSuggestion)}</span></div>`;
-  }
-  html += `</div>`;
-  html += `<div class="form-group"><label class="form-label">Output Files</label>
-    <input class="form-input" data-pcf-field="outputFiles" data-pcf-idx="${loopIdx}" type="text" value="${esc(loop.outputFiles || '')}" placeholder="tasks.md, results.md" autocomplete="off"></div>`;
-  html += `<div class="form-group"><label class="form-label">Multi-agent</label>
-    <div class="prompt-config-readonly">${loop.multi_agent ? 'Enabled (' + (loop.max_agents || 3) + ' agents, ' + (loop.strategy || 'parallel') + ')' : 'Disabled'}</div></div>`;
-  html += `<div class="form-group"><label class="form-label">Tracker Format</label>
-    <div class="prompt-config-readonly">Standard RalphFlow tracker &mdash; auto-generated</div></div>`;
-  html += '</div></div>';
-
-  // Per-stage configuration
-  html += '<div class="prompt-config-section">';
-  html += '<div class="prompt-config-section-title">Stage Configuration</div>';
-
-  if (loop.stages.length === 0) {
-    html += '<div style="color:var(--text-muted);font-size:12px;padding:8px 0">Add stages in the loop config above to configure per-stage instructions.</div>';
-  }
-
-  loop.stageConfigs.forEach((sc, sci) => {
-    html += '<div class="stage-config-card">';
-    html += '<div class="stage-config-header">';
-    html += `<span class="stage-config-name">${esc(sc.name)}</span>`;
-    html += `<span class="stage-config-index">Stage ${sci + 1} of ${loop.stageConfigs.length}</span>`;
-    html += '</div>';
-
-    html += `<div class="form-group" style="margin-bottom:8px"><label class="form-label">What should this stage do?</label>
-      <textarea class="form-input" data-pcf-stage-desc data-pcf-idx="${loopIdx}" data-pcf-stage="${sci}" style="min-height:60px;resize:vertical;font-family:var(--sans);font-size:13px;line-height:1.5" placeholder="Describe the purpose and work of this stage...">${esc(sc.description)}</textarea></div>`;
-
-    html += '<label class="form-label">Capabilities</label>';
-    html += '<div class="capability-grid">';
-    PROMPT_CAPABILITIES.forEach(cap => {
-      const checked = sc.capabilities[cap.id] ? ' checked' : '';
-      html += `<label class="capability-item">
-        <input type="checkbox" data-pcf-cap data-pcf-idx="${loopIdx}" data-pcf-stage="${sci}" data-pcf-cap-id="${cap.id}"${checked}>
-        <span class="capability-item-text">
-          <span class="capability-item-label">${esc(cap.label)}</span>
-          <span class="capability-item-desc">${esc(cap.desc)}</span>
-        </span>
-      </label>`;
-    });
-    html += '</div>';
-    html += '</div>';
-  });
-
-  html += '</div>';
-
-  // Generate button
+  html += '<div class="prompt-generate-card">';
+  html += '<div class="prompt-generate-info">Generate a structured prompt from your loop configuration &mdash; stages, input/output files, and model settings will be combined into a ready-to-use agent prompt.</div>';
   html += `<button class="btn btn-primary generate-prompt-btn" data-generate-prompt="${loopIdx}">Generate Prompt</button>`;
-
+  html += '</div>';
   html += '</div>';
   return html;
 }
@@ -573,64 +515,6 @@ export function renderPromptBuilderHTML(loopIdx, loop) {
 // -----------------------------------------------------------------------
 
 export function bindPromptConfigFormEvents() {
-  // I/O file suggestion clicks (auto-fill from previous loop's output)
-  dom.content.querySelectorAll('[data-suggest-input]').forEach(hint => {
-    hint.addEventListener('click', () => {
-      const idx = parseInt(hint.dataset.suggestInput);
-      if (state.templateBuilderState && idx > 0 && state.templateBuilderState.loops[idx - 1]) {
-        const prevOutput = (state.templateBuilderState.loops[idx - 1].outputFiles || '').trim();
-        if (prevOutput) {
-          state.templateBuilderState.loops[idx].inputFiles = prevOutput;
-          const inputEl = dom.content.querySelector(`[data-pcf-field="inputFiles"][data-pcf-idx="${idx}"]`);
-          if (inputEl) inputEl.value = prevOutput;
-          hint.remove();
-          actions.updateYamlPreview();
-          actions.updateMinimapIO();
-        }
-      }
-    });
-  });
-
-  // Input/output file fields
-  dom.content.querySelectorAll('[data-pcf-field]').forEach(input => {
-    input.addEventListener('input', () => {
-      const idx = parseInt(input.dataset.pcfIdx);
-      const field = input.dataset.pcfField;
-      if (state.templateBuilderState && state.templateBuilderState.loops[idx]) {
-        state.templateBuilderState.loops[idx][field] = input.value;
-        actions.updateYamlPreview();
-        if (field === 'inputFiles' || field === 'outputFiles') {
-          actions.updateMinimapIO();
-        }
-      }
-    });
-  });
-
-  // Stage description textareas
-  dom.content.querySelectorAll('[data-pcf-stage-desc]').forEach(textarea => {
-    textarea.addEventListener('input', () => {
-      const idx = parseInt(textarea.dataset.pcfIdx);
-      const stageIdx = parseInt(textarea.dataset.pcfStage);
-      const loop = state.templateBuilderState && state.templateBuilderState.loops[idx];
-      if (loop && loop.stageConfigs[stageIdx]) {
-        loop.stageConfigs[stageIdx].description = textarea.value;
-      }
-    });
-  });
-
-  // Capability checkboxes
-  dom.content.querySelectorAll('[data-pcf-cap]').forEach(checkbox => {
-    checkbox.addEventListener('change', () => {
-      const idx = parseInt(checkbox.dataset.pcfIdx);
-      const stageIdx = parseInt(checkbox.dataset.pcfStage);
-      const capId = checkbox.dataset.pcfCapId;
-      const loop = state.templateBuilderState && state.templateBuilderState.loops[idx];
-      if (loop && loop.stageConfigs[stageIdx]) {
-        loop.stageConfigs[stageIdx].capabilities[capId] = checkbox.checked;
-      }
-    });
-  });
-
   // "Generate Prompt" button
   dom.content.querySelectorAll('[data-generate-prompt]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -658,31 +542,7 @@ export function bindPromptConfigFormEvents() {
 }
 
 export function capturePromptConfigFormInputs() {
-  if (!state.templateBuilderState) return;
-  dom.content.querySelectorAll('[data-pcf-field]').forEach(input => {
-    const idx = parseInt(input.dataset.pcfIdx);
-    const field = input.dataset.pcfField;
-    if (state.templateBuilderState.loops[idx]) {
-      state.templateBuilderState.loops[idx][field] = input.value;
-    }
-  });
-  dom.content.querySelectorAll('[data-pcf-stage-desc]').forEach(textarea => {
-    const idx = parseInt(textarea.dataset.pcfIdx);
-    const stageIdx = parseInt(textarea.dataset.pcfStage);
-    const loop = state.templateBuilderState.loops[idx];
-    if (loop && loop.stageConfigs[stageIdx]) {
-      loop.stageConfigs[stageIdx].description = textarea.value;
-    }
-  });
-  dom.content.querySelectorAll('[data-pcf-cap]').forEach(checkbox => {
-    const idx = parseInt(checkbox.dataset.pcfIdx);
-    const stageIdx = parseInt(checkbox.dataset.pcfStage);
-    const capId = checkbox.dataset.pcfCapId;
-    const loop = state.templateBuilderState.loops[idx];
-    if (loop && loop.stageConfigs[stageIdx]) {
-      loop.stageConfigs[stageIdx].capabilities[capId] = checkbox.checked;
-    }
-  });
+  // No-op — form inputs are now captured via the loop card's captureBuilderInputs
 }
 
 export function bindPromptBuilderEvents() {
