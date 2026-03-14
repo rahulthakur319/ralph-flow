@@ -210,6 +210,10 @@
     height: 2px;
     background: var(--border);
     flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .pipeline-connector.complete {
+    background: var(--green);
   }
 
   /* Section */
@@ -1532,7 +1536,10 @@
     // Pipeline
     html += '<div class="section"><div class="section-title">Pipeline</div><div class="pipeline">';
     app.loops.forEach((loop, i) => {
-      if (i > 0) html += '<div class="pipeline-connector"></div>';
+      if (i > 0) {
+        const prevComplete = getLoopStatusClass(app.loops[i - 1]) === 'complete';
+        html += `<div class="pipeline-connector${prevComplete ? ' complete' : ''}"></div>`;
+      }
       const statusClass = getLoopStatusClass(loop);
       const isSelected = loop.key === selectedLoop;
       const modelDisplay = formatModelName(loop.model);
