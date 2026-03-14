@@ -709,6 +709,15 @@ function generateYamlPreview(tbs) {
     yaml += `    model: ${loop.model || 'claude-sonnet-4-6'}\n`;
     yaml += `    cadence: 0\n`;
 
+    const claudeArgsList = (loop.claudeArgs || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (claudeArgsList.length > 0) {
+      yaml += `    claude_args:\n`;
+      claudeArgsList.forEach(a => { yaml += `      - ${a}\n`; });
+    }
+    if (loop.skipPermissions === false) {
+      yaml += `    skip_permissions: false\n`;
+    }
+
     const ioFedBy = (loop.inputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
     const ioFeeds = (loop.outputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
     if (ioFedBy.length > 0) {
@@ -766,6 +775,13 @@ async function saveTemplate() {
       }
       if (feedsList.length > 0) {
         loopDef.feeds = feedsList;
+      }
+      const claudeArgsList = (loop.claudeArgs || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (claudeArgsList.length > 0) {
+        loopDef.claude_args = claudeArgsList;
+      }
+      if (loop.skipPermissions === false) {
+        loopDef.skip_permissions = false;
       }
       if (loop.prompt && loop.prompt.trim()) {
         loopDef.prompt = loop.prompt;
@@ -848,6 +864,8 @@ async function loadTemplateForEdit(templateName) {
         prompt: '',
         inputFiles: (loop.fed_by || []).join(', '),
         outputFiles: (loop.feeds || []).join(', '),
+        claudeArgs: (loop.claude_args || []).join(', '),
+        skipPermissions: loop.skip_permissions !== false,
         stageConfigs: [],
         showPromptForm: false,
         _outputAutoFilled: false,

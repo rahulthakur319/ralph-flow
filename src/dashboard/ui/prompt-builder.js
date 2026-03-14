@@ -42,6 +42,8 @@ export function createEmptyLoop() {
     outputFiles: '',
     stageConfigs: [],
     showPromptForm: true,
+    claudeArgs: '',
+    skipPermissions: true,
     _outputAutoFilled: true,
     _inputAutoFilled: true
   };
