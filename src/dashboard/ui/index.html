@@ -1162,7 +1162,6 @@
     margin-bottom: 12px;
     color: var(--text);
   }
-  .loop-cards { display: flex; flex-direction: column; gap: 12px; }
   .loop-card {
     background: var(--bg-surface);
     border: 1px solid var(--border);
@@ -1586,32 +1585,7 @@
     border-color: var(--accent);
     color: var(--accent);
   }
-  .loop-card.highlighted {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
-    transition: border-color 0.3s, box-shadow 0.3s;
-  }
-
   /* Drag-and-drop reordering */
-  .loop-card-drag-handle {
-    display: flex;
-    align-items: center;
-    cursor: grab;
-    color: var(--text-muted);
-    font-size: 14px;
-    padding: 0 4px;
-    user-select: none;
-    letter-spacing: 1px;
-  }
-  .loop-card-drag-handle:active { cursor: grabbing; }
-  .loop-card.dragging {
-    opacity: 0.4;
-    border-style: dashed;
-  }
-  .loop-card.drag-over {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
-  }
   .builder-minimap-node[draggable="true"] { cursor: grab; }
   .builder-minimap-node[draggable="true"]:active { cursor: grabbing; }
   .builder-minimap-node.dragging {
@@ -3791,14 +3765,6 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     const saveBtn = document.getElementById('builderSaveBtn');
     if (saveBtn) saveBtn.addEventListener('click', saveTemplate);
 
-    const addLoopBtn = document.getElementById('addLoopBtn');
-    if (addLoopBtn) addLoopBtn.addEventListener('click', () => {
-      captureBuilderInputs();
-      templateBuilderState.loops.push(createEmptyLoop());
-      selectedBuilderLoop = templateBuilderState.loops.length - 1;
-      renderTemplateBuilder();
-    });
-
     // Template name/desc inputs
     const tplName = document.getElementById('tplName');
     const tplDesc = document.getElementById('tplDesc');
@@ -3898,16 +3864,6 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
       });
     });
 
-    // Prompt section toggle
-    content.querySelectorAll('[data-toggle-prompt]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        captureBuilderInputs();
-        const idx = parseInt(btn.dataset.togglePrompt);
-        templateBuilderState.loops[idx].showPrompt = !templateBuilderState.loops[idx].showPrompt;
-        renderTemplateBuilder();
-      });
-    });
-
     // Prompt textarea input
     content.querySelectorAll('.prompt-textarea').forEach(textarea => {
       textarea.addEventListener('input', () => {
@@ -3945,46 +3901,8 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     bindPromptBuilderEvents();
   }
 
-  let minimapObserver = null;
-
-  function setupMinimapScrollSync() {
-    // Clean up previous observer
-    if (minimapObserver) { minimapObserver.disconnect(); minimapObserver = null; }
-
-    const cards = content.querySelectorAll('.loop-card[data-loop-index]');
-    if (cards.length === 0) return;
-
-    // Use the content area as the scroll root
-    const scrollRoot = content;
-
-    minimapObserver = new IntersectionObserver((entries) => {
-      // Find the most visible card
-      let bestEntry = null;
-      let bestRatio = 0;
-      for (const entry of entries) {
-        if (entry.isIntersecting && entry.intersectionRatio > bestRatio) {
-          bestRatio = entry.intersectionRatio;
-          bestEntry = entry;
-        }
-      }
-      if (bestEntry) {
-        const idx = bestEntry.target.dataset.loopIndex;
-        const minimapNodes = content.querySelectorAll('.builder-minimap-node');
-        minimapNodes.forEach(n => {
-          n.classList.toggle('active', n.dataset.minimapIdx === idx);
-        });
-      }
-    }, {
-      root: scrollRoot,
-      threshold: [0, 0.25, 0.5, 0.75, 1.0]
-    });
-
-    cards.forEach(card => minimapObserver.observe(card));
-  }
-
   function setupBuilderDragAndDrop() {
     let dragSrcIdx = null;
-    let dragSource = null; // 'minimap' or 'card'
 
     function reorderLoops(fromIdx, toIdx) {
       if (fromIdx === toIdx) return;
@@ -3992,6 +3910,15 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
       const loops = templateBuilderState.loops;
       const [moved] = loops.splice(fromIdx, 1);
       loops.splice(toIdx, 0, moved);
+      // Update selectedBuilderLoop to follow the same loop object
+      if (selectedBuilderLoop === fromIdx) {
+        selectedBuilderLoop = toIdx;
+      } else {
+        let newSel = selectedBuilderLoop;
+        if (fromIdx < newSel) newSel--;
+        if (toIdx <= newSel) newSel++;
+        selectedBuilderLoop = newSel;
+      }
       renderTemplateBuilder();
     }
 
@@ -3999,7 +3926,6 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     content.querySelectorAll('.builder-minimap-node[draggable="true"]').forEach(node => {
       node.addEventListener('dragstart', (e) => {
         dragSrcIdx = parseInt(node.dataset.minimapIdx);
-        dragSource = 'minimap';
         node.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', dragSrcIdx);
@@ -4009,7 +3935,6 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
         node.classList.remove('dragging');
         content.querySelectorAll('.builder-minimap-node.drag-over').forEach(n => n.classList.remove('drag-over'));
         dragSrcIdx = null;
-        dragSource = null;
       });
 
       node.addEventListener('dragover', (e) => {
@@ -4035,48 +3960,6 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
       });
     });
 
-    // Loop card drag events
-    content.querySelectorAll('.loop-card[draggable="true"]').forEach(card => {
-      card.addEventListener('dragstart', (e) => {
-        dragSrcIdx = parseInt(card.dataset.loopIndex);
-        dragSource = 'card';
-        card.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', dragSrcIdx);
-      });
-
-      card.addEventListener('dragend', () => {
-        card.classList.remove('dragging');
-        content.querySelectorAll('.loop-card.drag-over').forEach(c => c.classList.remove('drag-over'));
-        dragSrcIdx = null;
-        dragSource = null;
-      });
-
-      card.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const targetIdx = parseInt(card.dataset.loopIndex);
-        if (targetIdx !== dragSrcIdx) {
-          card.classList.add('drag-over');
-        }
-      });
-
-      card.addEventListener('dragleave', (e) => {
-        // Only remove if leaving the card entirely (not entering a child)
-        if (!card.contains(e.relatedTarget)) {
-          card.classList.remove('drag-over');
-        }
-      });
-
-      card.addEventListener('drop', (e) => {
-        e.preventDefault();
-        card.classList.remove('drag-over');
-        const toIdx = parseInt(card.dataset.loopIndex);
-        if (dragSrcIdx !== null && dragSrcIdx !== toIdx) {
-          reorderLoops(dragSrcIdx, toIdx);
-        }
-      });
-    });
   }
 
   // Capture current input values into state before re-render
