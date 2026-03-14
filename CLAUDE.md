@@ -123,6 +123,9 @@ Same pattern in `template.ts` and `server.ts`.
 ### Per-Loop Model Configuration
 Each loop in `ralphflow.yaml` supports an optional `model` field (e.g., `model: claude-sonnet-4-6`). The runner resolves the effective model as: CLI `--model` flag (global override) → per-loop `model` from config → Claude default. Both built-in templates default all loops to `claude-sonnet-4-6`. The dashboard Edit panel includes a model selector dropdown that calls `PUT /api/apps/:app/config/model` to update the loop's model in `ralphflow.yaml`. Selecting "Default" removes the model field. Pipeline nodes display the model inline with the status badge, separated by a middot (·). The `formatModelName()` function strips the `claude-` prefix for compactness (e.g., `sonnet-4-6`). Loops with no explicit model show "default" in dimmed italic styling.
 
+### Per-Loop Claude CLI Arguments
+Each loop in `ralphflow.yaml` supports optional `claude_args` (string array of additional CLI flags, e.g., `["--chrome"]`) and `skip_permissions` (boolean, defaults to `true`). Both `LoopConfig` and `TemplateLoopDefinition` include these fields. `createCustomTemplate()` writes them to YAML only when provided (no empty arrays). Omitting both fields preserves backward compatibility — existing configs parse and work unchanged.
+
 ### Pipeline Progress Calculation
 `calculatePipelineProgress(loops)` in `ui/index.html` computes weighted aggregate progress across loops. Returns `{ perLoop: [{key, completed, total, fraction}], completed, total, percentage }`. Loops with 0 total items are excluded from the denominator. Used by pipeline node rendering (TASK-4) and sidebar progress bars (TASK-6).
 
