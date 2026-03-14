@@ -29,7 +29,9 @@ src/
 │   ├── api.ts                — REST endpoints: /api/apps, status, config, db, prompt CRUD, tracker, files, archives, templates
 │   ├── hooks.ts              — Claude Code Notification hook management for .claude/settings.local.json
 │   ├── watcher.ts            — Chokidar file watcher → WebSocket broadcast, DB polling every 2s
-│   └── ui/index.html         — Single-file vanilla JS frontend (dark theme, no build step)
+│   └── ui/
+│       ├── index.html        — HTML structure + inline JS (dark theme, no build step)
+│       └── styles.css        — Extracted CSS stylesheet (all dashboard styles)
 └── templates/
     ├── claude-md.template.md — CLAUDE.md template with {{VAR}} substitution
     ├── code-implementation/  — Story → Tasks → Delivery (3 loops, multi-agent on tasks)
@@ -145,6 +147,9 @@ Template builder minimap nodes show I/O file names from the builder state. Input
 - [x] TASK-1: Description {agent: agent-1, status: completed}
 - [ ] TASK-2: Description {agent: agent-2, status: in_progress}
 ```
+
+### Static File Serving (dashboard/server.ts)
+`resolveUiDir()` locates the `ui/` directory using dev/bundled dual-path resolution. The server serves `index.html` at `/` and static `.css`/`.js` files via a pattern-matched route (`/:file{.+\\.(css|js)$}`). Path traversal is guarded by checking `filePath.startsWith(uiDir)`. Content types are mapped via the `CONTENT_TYPES` constant. This enables the CSS extraction (`styles.css`) and future JS module extraction without a build step.
 
 ### Claude Hooks Management (dashboard/hooks.ts)
 `installNotificationHook(cwd, port)` writes a Notification hook to `.claude/settings.local.json` that pipes Claude's attention events to the dashboard via `curl POST`. `removeNotificationHook(cwd)` removes only the RalphFlow-managed entry (identified by `# ralphflow-managed` marker comment), preserving user hooks. Both functions handle missing dirs, missing files, and malformed JSON gracefully.
