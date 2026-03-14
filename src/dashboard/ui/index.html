@@ -267,6 +267,46 @@
   .pipeline-connector.complete {
     background: var(--green);
   }
+  .pipeline-connector-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .pipeline-connector-wrap .connector-file {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pipeline-node .node-io {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 140px;
+  }
+  .pipeline-node .node-io-label {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--text-muted);
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(139,148,158,0.08);
+    white-space: nowrap;
+  }
+  .pipeline-node .node-io-in .node-io-label {
+    color: var(--blue);
+    background: rgba(88,166,255,0.08);
+  }
+  .pipeline-node .node-io-out .node-io-label {
+    color: var(--green);
+    background: rgba(63,185,80,0.08);
+  }
 
   /* Section */
   .section {
@@ -2145,7 +2185,17 @@
     app.loops.forEach((loop, i) => {
       if (i > 0) {
         const prevComplete = getLoopStatusClass(app.loops[i - 1]) === 'complete';
-        html += `<div class="pipeline-connector${prevComplete ? ' complete' : ''}"></div>`;
+        const prevOut = app.loops[i - 1].feeds || [];
+        const curIn = loop.fed_by || [];
+        const sharedFiles = prevOut.filter(f => curIn.includes(f));
+        if (sharedFiles.length > 0) {
+          html += `<div class="pipeline-connector-wrap">
+            <div class="pipeline-connector${prevComplete ? ' complete' : ''}"></div>
+            <span class="connector-file" title="${esc(sharedFiles.join(', '))}">${esc(sharedFiles.join(', '))}</span>
+          </div>`;
+        } else {
+          html += `<div class="pipeline-connector${prevComplete ? ' complete' : ''}"></div>`;
+        }
       }
       const statusClass = getLoopStatusClass(loop);
       const isSelected = loop.key === selectedLoop;
@@ -2153,7 +2203,12 @@
       const lp = progressByKey[loop.key] || { completed: 0, total: 0, fraction: 0 };
       const progressText = lp.total > 0 ? `${lp.completed}/${lp.total}` : '\u2014';
       const progressPct = Math.round(lp.fraction * 100);
+      const fedBy = loop.fed_by || [];
+      const feeds = loop.feeds || [];
+      const inputIo = fedBy.length > 0 ? `<div class="node-io node-io-in">${fedBy.map(f => `<span class="node-io-label" title="input: ${esc(f)}">${esc(f)}</span>`).join('')}</div>` : '';
+      const outputIo = feeds.length > 0 ? `<div class="node-io node-io-out">${feeds.map(f => `<span class="node-io-label" title="output: ${esc(f)}">${esc(f)}</span>`).join('')}</div>` : '';
       html += `<div class="pipeline-node${isSelected ? ' selected' : ''}" data-loop="${esc(loop.key)}">
+        ${inputIo}
         <span class="node-name">${esc(loop.name)}</span>
         <span class="node-status-row">
           <span class="node-status ${statusClass}">${statusClass}</span>
@@ -2164,6 +2219,7 @@
           <span class="node-progress-text">${progressText}</span>
           <div class="node-progress-bar"><div class="node-progress-fill" style="width:${progressPct}%"></div></div>
         </div>
+        ${outputIo}
       </div>`;
     });
     html += '</div></div>';

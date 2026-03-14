@@ -95,6 +95,8 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
           stages: loop.stages,
           multiAgent: !!(loop.multi_agent && typeof loop.multi_agent === 'object' && loop.multi_agent.enabled),
           model: loop.model || null,
+          feeds: loop.feeds || [],
+          fed_by: loop.fed_by || [],
         })),
       };
     });
