@@ -100,6 +100,9 @@ Each loop in `ralphflow.yaml` supports an optional `model` field (e.g., `model: 
 ### Pipeline Progress Calculation
 `calculatePipelineProgress(loops)` in `ui/index.html` computes weighted aggregate progress across loops. Returns `{ perLoop: [{key, completed, total, fraction}], completed, total, percentage }`. Loops with 0 total items are excluded from the denominator. Used by pipeline node rendering (TASK-4) and sidebar progress bars (TASK-6).
 
+### Pipeline Connector Coloring
+Connectors between pipeline nodes turn green (`var(--green)`) when the left-adjacent loop is complete (`getLoopStatusClass() === 'complete'`). This creates a visual "flow" of green from left to right through completed loops. A CSS transition (0.3s) smooths color changes. The `.pipeline-connector.complete` class is toggled during pipeline rendering based on the previous loop's status.
+
 ### Multi-Agent Coordination
 - PID-based lock files in `.agents/` directory next to tracker
 - `acquireAgentId()` claims `agent-N.lock`, `releaseAgentId()` removes on exit
