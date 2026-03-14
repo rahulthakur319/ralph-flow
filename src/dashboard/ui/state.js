@@ -44,6 +44,9 @@ export const state = {
   viewingTemplateName: null,
   viewingTemplateConfig: null,
   viewingTemplatePrompts: {},
+  showTemplateWizard: false,
+  wizardStep: 0,
+  wizardData: null,
 };
 
 // Cross-module function registry.
