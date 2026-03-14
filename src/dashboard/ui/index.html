@@ -1466,6 +1466,38 @@
     gap: 8px;
     margin-top: 8px;
   }
+  /* Variable palette */
+  .prompt-builder-palette-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+  }
+  .variable-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    margin: 0 4px 4px 0;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--purple);
+    background: rgba(188, 140, 255, 0.08);
+    border: 1px solid rgba(188, 140, 255, 0.2);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .variable-chip:hover {
+    background: rgba(188, 140, 255, 0.15);
+    border-color: var(--purple);
+  }
+  /* Variable highlighting in preview */
+  .prompt-builder-preview .var-highlight {
+    color: var(--purple);
+    background: rgba(188, 140, 255, 0.1);
+    border-radius: 3px;
+    padding: 1px 3px;
+    font-weight: 500;
+  }
   .prompt-builder-empty {
     display: flex;
     align-items: center;
@@ -3229,6 +3261,17 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     }
   ];
 
+  const PROMPT_VARIABLES = [
+    { name: 'APP_NAME', description: 'Flow directory name (e.g. "code-implementation")' },
+    { name: 'AGENT_NAME', description: 'Agent identifier (e.g. "agent-1") — multi-agent only' },
+    { name: 'LOOP_NAME', description: 'Loop config key (e.g. "tasks-loop")' }
+  ];
+
+  function highlightVariables(text) {
+    return esc(text).replace(/\{\{([A-Z_]+)\}\}/g,
+      '<span class="var-highlight">{{$1}}</span>');
+  }
+
   function assemblePromptFromBlocks(blocks) {
     return blocks.map(b => b.content).join('\n\n---\n\n');
   }
@@ -3469,6 +3512,14 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
       html += `<span class="palette-block-icon">${bt.icon}</span>${esc(bt.label)}`;
       html += '</div>';
     });
+    // Variable palette
+    html += '<div class="prompt-builder-palette-divider"></div>';
+    html += '<div class="prompt-builder-palette-title">Variables</div>';
+    html += '<div style="display:flex;flex-wrap:wrap">';
+    PROMPT_VARIABLES.forEach(v => {
+      html += `<span class="variable-chip" data-insert-var="${v.name}" data-var-loop="${loopIdx}" title="${esc(v.description)}">{{${v.name}}}</span>`;
+    });
+    html += '</div>';
     html += '</div>';
 
     // Sections (active blocks)
@@ -3499,7 +3550,7 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     // Live preview
     html += '<div class="prompt-builder-preview">';
     html += '<div class="prompt-builder-preview-title">Preview</div>';
-    html += `<pre id="builderPreview-${loopIdx}">${esc(assemblePromptFromBlocks(loop.blocks))}</pre>`;
+    html += `<pre id="builderPreview-${loopIdx}">${highlightVariables(assemblePromptFromBlocks(loop.blocks))}</pre>`;
     html += '</div>';
 
     html += '</div>'; // close prompt-builder
@@ -3620,10 +3671,10 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
         const loopIdx = parseInt(textarea.dataset.bcLoop);
         const blockIdx = parseInt(textarea.dataset.bcIdx);
         templateBuilderState.loops[loopIdx].blocks[blockIdx].content = textarea.value;
-        // Update preview
+        // Update preview with variable highlighting
         const preview = document.getElementById(`builderPreview-${loopIdx}`);
         if (preview) {
-          preview.textContent = assemblePromptFromBlocks(templateBuilderState.loops[loopIdx].blocks);
+          preview.innerHTML = highlightVariables(assemblePromptFromBlocks(templateBuilderState.loops[loopIdx].blocks));
         }
       });
     });
@@ -3659,6 +3710,30 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
         const [moved] = blocks.splice(srcIdx, 1);
         blocks.splice(destIdx, 0, moved);
         renderTemplateBuilder();
+      });
+    });
+
+    // Variable chip click-to-insert
+    content.querySelectorAll('[data-insert-var]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const varName = chip.dataset.insertVar;
+        const loopIdx = parseInt(chip.dataset.varLoop);
+        const varText = `{{${varName}}}`;
+        // Find the last focused block textarea in this loop's builder
+        const textareas = content.querySelectorAll(`[data-block-content][data-bc-loop="${loopIdx}"]`);
+        // Use the last active textarea or the last one
+        let target = null;
+        textareas.forEach(ta => { if (ta === document.activeElement) target = ta; });
+        if (!target && textareas.length > 0) target = textareas[textareas.length - 1];
+        if (target) {
+          const start = target.selectionStart;
+          const end = target.selectionEnd;
+          const val = target.value;
+          target.value = val.slice(0, start) + varText + val.slice(end);
+          target.selectionStart = target.selectionEnd = start + varText.length;
+          target.focus();
+          target.dispatchEvent(new Event('input', { bubbles: true }));
+        }
       });
     });
   }
