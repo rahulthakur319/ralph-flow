@@ -1804,9 +1804,46 @@
     color: var(--text-muted);
   }
   .builder-minimap-connector {
-    width: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: 24px;
+    gap: 2px;
+  }
+  .builder-minimap-connector-line {
+    width: 100%;
     height: 2px;
     background: var(--border);
+  }
+  .builder-minimap-connector-file {
+    font-size: 9px;
+    color: var(--accent);
+    white-space: nowrap;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1;
+  }
+  .minimap-io {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    max-width: 100px;
+  }
+  .minimap-io-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+    line-height: 1;
+  }
+  .minimap-io-arrow {
+    font-size: 8px;
+    color: var(--text-dim);
     flex-shrink: 0;
   }
   .builder-minimap-add {
@@ -3777,16 +3814,33 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
     html += '<div class="builder-minimap" id="builderMinimap" style="flex-wrap:wrap">';
     state.loops.forEach((lp, i) => {
       if (i > 0) {
-        html += '<div class="builder-minimap-connector"></div>';
+        // Check for shared file between previous loop's output and this loop's input
+        const prevOut = (state.loops[i - 1].outputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+        const curIn = (lp.inputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+        const shared = prevOut.filter(f => curIn.includes(f));
+        html += '<div class="builder-minimap-connector" data-connector-idx="' + i + '">';
+        if (shared.length > 0) {
+          html += `<span class="builder-minimap-connector-file" title="${esc(shared.join(', '))}">${esc(shared[0])}${shared.length > 1 ? '+' + (shared.length - 1) : ''}</span>`;
+        }
+        html += '<div class="builder-minimap-connector-line"></div>';
+        html += '</div>';
       }
       const label = lp.name || `Loop ${i + 1}`;
-      html += `<div class="builder-minimap-node${i === si ? ' active' : ''}" data-minimap-idx="${i}" draggable="true">
-        <span class="minimap-label">${esc(label)}</span>
-        <span class="minimap-index">${i + 1}</span>
-      </div>`;
+      const inFiles = (lp.inputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+      const outFiles = (lp.outputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+      html += `<div class="builder-minimap-node${i === si ? ' active' : ''}" data-minimap-idx="${i}" draggable="true">`;
+      if (inFiles.length > 0) {
+        html += `<span class="minimap-io minimap-io-in" data-minimap-io="in-${i}"><span class="minimap-io-arrow">&rarr;</span><span class="minimap-io-label" title="${esc(inFiles.join(', '))}">${esc(inFiles[0])}${inFiles.length > 1 ? '+' + (inFiles.length - 1) : ''}</span></span>`;
+      }
+      html += `<span class="minimap-label">${esc(label)}</span>`;
+      html += `<span class="minimap-index">${i + 1}</span>`;
+      if (outFiles.length > 0) {
+        html += `<span class="minimap-io minimap-io-out" data-minimap-io="out-${i}"><span class="minimap-io-label" title="${esc(outFiles.join(', '))}">${esc(outFiles[0])}${outFiles.length > 1 ? '+' + (outFiles.length - 1) : ''}</span><span class="minimap-io-arrow">&rarr;</span></span>`;
+      }
+      html += `</div>`;
     });
     if (state.loops.length > 0) {
-      html += '<div class="builder-minimap-connector"></div>';
+      html += '<div class="builder-minimap-connector"><div class="builder-minimap-connector-line"></div></div>';
     }
     html += '<button class="builder-minimap-add" id="minimapAddBtn" title="Add loop">+</button>';
     html += '</div></div>';
@@ -4296,6 +4350,7 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
             if (inputEl) inputEl.value = prevOutput;
             hint.remove();
             updateYamlPreview();
+            updateMinimapIO();
           }
         }
       });
@@ -4309,6 +4364,9 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
         if (templateBuilderState && templateBuilderState.loops[idx]) {
           templateBuilderState.loops[idx][field] = input.value;
           updateYamlPreview();
+          if (field === 'inputFiles' || field === 'outputFiles') {
+            updateMinimapIO();
+          }
         }
       });
     });
@@ -4851,6 +4909,98 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
     if (preview && templateBuilderState) {
       preview.textContent = generateYamlPreview(templateBuilderState);
     }
+  }
+
+  function updateMinimapIO() {
+    if (!templateBuilderState) return;
+    const state = templateBuilderState;
+    state.loops.forEach((lp, i) => {
+      const node = content.querySelector(`.builder-minimap-node[data-minimap-idx="${i}"]`);
+      if (!node) return;
+      const inFiles = (lp.inputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+      const outFiles = (lp.outputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+      // Update or create input file label
+      let inEl = node.querySelector('.minimap-io-in');
+      if (inFiles.length > 0) {
+        const inHtml = `<span class="minimap-io-arrow">&rarr;</span><span class="minimap-io-label" title="${esc(inFiles.join(', '))}">${esc(inFiles[0])}${inFiles.length > 1 ? '+' + (inFiles.length - 1) : ''}</span>`;
+        if (inEl) {
+          inEl.innerHTML = inHtml;
+        } else {
+          inEl = document.createElement('span');
+          inEl.className = 'minimap-io minimap-io-in';
+          inEl.setAttribute('data-minimap-io', 'in-' + i);
+          inEl.innerHTML = inHtml;
+          node.insertBefore(inEl, node.firstChild);
+        }
+      } else if (inEl) {
+        inEl.remove();
+      }
+      // Update or create output file label
+      let outEl = node.querySelector('.minimap-io-out');
+      if (outFiles.length > 0) {
+        const outHtml = `<span class="minimap-io-label" title="${esc(outFiles.join(', '))}">${esc(outFiles[0])}${outFiles.length > 1 ? '+' + (outFiles.length - 1) : ''}</span><span class="minimap-io-arrow">&rarr;</span>`;
+        if (outEl) {
+          outEl.innerHTML = outHtml;
+        } else {
+          outEl = document.createElement('span');
+          outEl.className = 'minimap-io minimap-io-out';
+          outEl.setAttribute('data-minimap-io', 'out-' + i);
+          outEl.innerHTML = outHtml;
+          node.appendChild(outEl);
+        }
+      } else if (outEl) {
+        outEl.remove();
+      }
+      // Update connector between this loop and the next
+      if (i > 0) {
+        const connector = content.querySelector(`.builder-minimap-connector[data-connector-idx="${i}"]`);
+        if (connector) {
+          const prevOut = (state.loops[i - 1].outputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+          const curIn = inFiles;
+          const shared = prevOut.filter(f => curIn.includes(f));
+          let fileEl = connector.querySelector('.builder-minimap-connector-file');
+          if (shared.length > 0) {
+            const label = esc(shared[0]) + (shared.length > 1 ? '+' + (shared.length - 1) : '');
+            if (fileEl) {
+              fileEl.textContent = label;
+              fileEl.title = shared.join(', ');
+            } else {
+              fileEl = document.createElement('span');
+              fileEl.className = 'builder-minimap-connector-file';
+              fileEl.textContent = label;
+              fileEl.title = shared.join(', ');
+              connector.insertBefore(fileEl, connector.firstChild);
+            }
+          } else if (fileEl) {
+            fileEl.remove();
+          }
+        }
+      }
+      // Also update the connector after this loop (for the next loop)
+      if (i < state.loops.length - 1) {
+        const nextConnector = content.querySelector(`.builder-minimap-connector[data-connector-idx="${i + 1}"]`);
+        if (nextConnector) {
+          const nextIn = (state.loops[i + 1].inputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+          const shared = outFiles.filter(f => nextIn.includes(f));
+          let fileEl = nextConnector.querySelector('.builder-minimap-connector-file');
+          if (shared.length > 0) {
+            const label = esc(shared[0]) + (shared.length > 1 ? '+' + (shared.length - 1) : '');
+            if (fileEl) {
+              fileEl.textContent = label;
+              fileEl.title = shared.join(', ');
+            } else {
+              fileEl = document.createElement('span');
+              fileEl.className = 'builder-minimap-connector-file';
+              fileEl.textContent = label;
+              fileEl.title = shared.join(', ');
+              nextConnector.insertBefore(fileEl, nextConnector.firstChild);
+            }
+          } else if (fileEl) {
+            fileEl.remove();
+          }
+        }
+      }
+    });
   }
 
   function generateYamlPreview(state) {
