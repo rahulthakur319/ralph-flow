@@ -36,6 +36,23 @@ interface Notification {
 
 const notifications: Notification[] = [];
 
+// ---------------------------------------------------------------------------
+// In-memory decision store
+// ---------------------------------------------------------------------------
+
+interface Decision {
+  id: string;
+  timestamp: string;
+  app: string;
+  loop: string;
+  item: string;
+  agent: string;
+  decision: string;
+  reasoning: string;
+}
+
+const decisions: Decision[] = [];
+
 function broadcastWs(wss: WebSocketServer | undefined, event: unknown): void {
   if (!wss) return;
   const data = JSON.stringify(event);
@@ -173,6 +190,13 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
       }
     }
 
+    // Remove matching decisions from in-memory store
+    for (let i = decisions.length - 1; i >= 0; i--) {
+      if (decisions[i].app === appName) {
+        decisions.splice(i, 1);
+      }
+    }
+
     return c.json({ ok: true, appName });
   });
 
@@ -272,10 +296,15 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
         // DB cleanup is best-effort
       }
 
-      // Step 4: Purge in-memory notifications for this app
+      // Step 4: Purge in-memory notifications and decisions for this app
       for (let i = notifications.length - 1; i >= 0; i--) {
         if (notifications[i].app === appName) {
           notifications.splice(i, 1);
+        }
+      }
+      for (let i = decisions.length - 1; i >= 0; i--) {
+        if (decisions[i].app === appName) {
+          decisions.splice(i, 1);
         }
       }
 
@@ -833,6 +862,60 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
     }
     notifications.splice(idx, 1);
     broadcastWs(wss, { type: 'notification:dismissed', id });
+    return c.json({ ok: true });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Decision reporting endpoints
+  // ---------------------------------------------------------------------------
+
+  // POST /api/decision — receive a decision report from an agent
+  api.post('/api/decision', async (c) => {
+    const app = c.req.query('app') || 'unknown';
+    const loop = c.req.query('loop') || 'unknown';
+
+    let body: { item?: string; agent?: string; decision?: string; reasoning?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    if (!body.item || !body.decision) {
+      return c.json({ error: 'item and decision are required' }, 400);
+    }
+
+    const decision: Decision = {
+      id: randomUUID(),
+      timestamp: new Date().toISOString(),
+      app,
+      loop,
+      item: body.item,
+      agent: body.agent || 'unknown',
+      decision: body.decision,
+      reasoning: body.reasoning || '',
+    };
+
+    decisions.push(decision);
+    broadcastWs(wss, { type: 'decision:reported', decision });
+
+    return c.json(decision, 200);
+  });
+
+  // GET /api/decisions — return all undismissed decisions
+  api.get('/api/decisions', (c) => {
+    return c.json(decisions);
+  });
+
+  // DELETE /api/decision/:id — dismiss a decision by ID
+  api.delete('/api/decision/:id', (c) => {
+    const id = c.req.param('id');
+    const idx = decisions.findIndex((d) => d.id === id);
+    if (idx === -1) {
+      return c.json({ error: 'Decision not found' }, 404);
+    }
+    decisions.splice(idx, 1);
+    broadcastWs(wss, { type: 'decision:dismissed', id });
     return c.json({ ok: true });
   });
 
