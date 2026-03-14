@@ -1298,6 +1298,185 @@
   .prompt-textarea:focus { border-color: var(--accent); outline: none; }
   .prompt-textarea::placeholder { color: var(--text-muted); }
 
+  /* Prompt Builder */
+  .prompt-builder {
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    display: grid;
+    grid-template-columns: 180px 1fr 1fr;
+    min-height: 400px;
+    max-height: 600px;
+  }
+  .prompt-builder-palette {
+    border-right: 1px solid var(--border);
+    padding: 8px;
+    overflow-y: auto;
+  }
+  .prompt-builder-palette-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 0 8px;
+  }
+  .palette-block {
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text);
+    background: var(--bg-surface);
+    border: 1px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .palette-block:hover {
+    background: var(--bg-hover);
+    border-color: var(--border);
+  }
+  .palette-block-icon {
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+    margin-right: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .prompt-builder-sections {
+    border-right: 1px solid var(--border);
+    padding: 8px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .prompt-builder-sections-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 0 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .builder-block {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-surface);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .builder-block.dragging {
+    opacity: 0.4;
+  }
+  .builder-block.drag-over {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .builder-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    background: var(--bg-active);
+    cursor: grab;
+    gap: 6px;
+  }
+  .builder-block-header:active { cursor: grabbing; }
+  .builder-block-grip {
+    color: var(--text-muted);
+    font-size: 10px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .builder-block-label {
+    font-size: 12px;
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .builder-block-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .builder-block-actions button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 12px;
+    border-radius: 3px;
+    line-height: 1;
+  }
+  .builder-block-actions button:hover {
+    color: var(--text);
+    background: var(--bg-hover);
+  }
+  .builder-block-body {
+    padding: 6px 8px;
+  }
+  .builder-block-body textarea {
+    width: 100%;
+    min-height: 60px;
+    max-height: 200px;
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+  .builder-block-body textarea:focus { border-color: var(--accent); outline: none; }
+  .prompt-builder-preview {
+    padding: 8px;
+    overflow-y: auto;
+  }
+  .prompt-builder-preview-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 0 8px;
+  }
+  .prompt-builder-preview pre {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .prompt-builder-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .prompt-builder-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 40px 20px;
+    text-align: center;
+  }
+
   /* Builder pipeline minimap */
   .builder-minimap {
     display: flex;
@@ -1375,6 +1554,37 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent);
     transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  /* Drag-and-drop reordering */
+  .loop-card-drag-handle {
+    display: flex;
+    align-items: center;
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 0 4px;
+    user-select: none;
+    letter-spacing: 1px;
+  }
+  .loop-card-drag-handle:active { cursor: grabbing; }
+  .loop-card.dragging {
+    opacity: 0.4;
+    border-style: dashed;
+  }
+  .loop-card.drag-over {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .builder-minimap-node[draggable="true"] { cursor: grab; }
+  .builder-minimap-node[draggable="true"]:active { cursor: grabbing; }
+  .builder-minimap-node.dragging {
+    opacity: 0.4;
+    border-style: dashed;
+  }
+  .builder-minimap-node.drag-over {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
   }
 </style>
 </head>
@@ -2903,8 +3113,124 @@
       entities: [],
       showOptional: false,
       showPrompt: false,
-      prompt: ''
+      prompt: '',
+      useBuilder: false,
+      blocks: []
     };
+  }
+
+  // Prompt builder block type definitions
+  const PROMPT_BLOCK_TYPES = [
+    {
+      id: 'header',
+      label: 'Header / Identity',
+      icon: '#',
+      skeleton: `# {loop_name} Loop — {purpose}
+
+**App:** \`{{APP_NAME}}\` — all flow files live under \`.ralph-flow/{{APP_NAME}}/\`.
+
+Read \`.ralph-flow/{{APP_NAME}}/{loop_dir}/tracker.md\` FIRST to determine where you are.
+
+> **PROJECT CONTEXT.** Read \`CLAUDE.md\` for architecture, stack, conventions, commands, and URLs.
+
+**Pipeline:** \`{input_file} → YOU → {output_file}\``
+    },
+    {
+      id: 'state-machine',
+      label: 'State Machine',
+      icon: '⟳',
+      skeleton: `## State Machine
+
+\`\`\`
+{STAGE_1}  → {description_1}  → stage: {next_stage_1}
+{STAGE_2}  → {description_2}  → stage: {next_stage_2}
+{STAGE_3}  → {description_3}  → done
+\`\`\`
+
+When ALL done: \`<promise>{COMPLETION_STRING}</promise>\`
+
+After completing ANY stage, exit: \`kill -INT $PPID\``
+    },
+    {
+      id: 'tracker-protocol',
+      label: 'Tracker Protocol',
+      icon: '🔒',
+      skeleton: `## Tracker Lock Protocol
+
+Before ANY write to \`tracker.md\`, you MUST acquire the lock:
+
+**Lock file:** \`.ralph-flow/{{APP_NAME}}/{loop_dir}/.tracker-lock\`
+
+### Acquire Lock
+1. Check if \`.tracker-lock\` exists
+   - Exists AND file is < 60 seconds old → sleep 2s, retry (up to 5 retries)
+   - Exists AND file is ≥ 60 seconds old → stale lock, delete it
+   - Does not exist → continue
+2. Write lock: \`echo "{{AGENT_NAME}} $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .tracker-lock\`
+3. Sleep 500ms (\`sleep 0.5\`)
+4. Re-read \`.tracker-lock\` — verify YOUR agent name is in it
+   - Your name → you own the lock, proceed
+   - Other name → you lost the race, retry from step 1
+5. Write your changes to \`tracker.md\`
+6. Delete \`.tracker-lock\` immediately`
+    },
+    {
+      id: 'stage-instructions',
+      label: 'Stage Instructions',
+      icon: '▶',
+      skeleton: `## STAGE 1: {STAGE_NAME}
+
+1. Read tracker → determine current state
+2. {Read input files and explore codebase}
+3. {Core work for this stage}
+4. Acquire lock → update tracker: stage, last_heartbeat, log entry → release lock
+5. {Produce output or commit changes}
+6. Exit: \`kill -INT $PPID\``
+    },
+    {
+      id: 'output-format',
+      label: 'Output Format',
+      icon: '📋',
+      skeleton: `## Output Format
+
+\`\`\`markdown
+## {ENTITY}-{N}: {Title}
+
+**Source:** {source_reference}
+**Depends on:** {dependency_or_None}
+
+### Intent
+{What this item accomplishes and why}
+
+### Acceptance Criteria
+- [ ] {Criterion 1}
+- [ ] {Criterion 2}
+\`\`\``
+    },
+    {
+      id: 'rules',
+      label: 'Rules',
+      icon: '⚙',
+      skeleton: `## Rules
+
+- One item at a time per agent. One stage per iteration.
+- Read tracker first, update tracker last. Always use lock protocol for writes.
+- Read \`CLAUDE.md\` for all project-specific context.
+- Thorough exploration before making changes.
+- **Multi-agent: never touch another agent's in_progress task. Coordinate via tracker.md.**`
+    },
+    {
+      id: 'custom',
+      label: 'Custom Section',
+      icon: '✎',
+      skeleton: `## {Section Title}
+
+{Your content here}`
+    }
+  ];
+
+  function assemblePromptFromBlocks(blocks) {
+    return blocks.map(b => b.content).join('\n\n---\n\n');
   }
 
   function initTemplateBuilderState() {
@@ -2998,7 +3324,7 @@
         html += '<div class="builder-minimap-connector"></div>';
       }
       const label = loop.name || `Loop ${i + 1}`;
-      html += `<div class="builder-minimap-node" data-minimap-idx="${i}">
+      html += `<div class="builder-minimap-node" data-minimap-idx="${i}" draggable="true">
         <span class="minimap-label">${esc(label)}</span>
         <span class="minimap-index">${i + 1}</span>
       </div>`;
@@ -3092,7 +3418,16 @@
 
       if (loop.showPrompt) {
         html += '<div class="prompt-section">';
-        html += `<textarea class="prompt-textarea" data-prompt-idx="${i}" placeholder="Add your prompt here...">${esc(loop.prompt)}</textarea>`;
+        if (loop.useBuilder) {
+          // Block-based prompt builder
+          html += renderPromptBuilderHTML(i, loop);
+        } else {
+          // Raw textarea mode
+          html += `<textarea class="prompt-textarea" data-prompt-idx="${i}" placeholder="Add your prompt here...">${esc(loop.prompt)}</textarea>`;
+          html += `<div class="prompt-builder-toolbar">`;
+          html += `<button class="btn btn-muted" data-use-builder="${i}" style="font-size:11px;padding:4px 10px">Use Builder</button>`;
+          html += `</div>`;
+        }
         html += '</div>';
       }
 
@@ -3119,6 +3454,225 @@
 
     content.innerHTML = html;
     bindTemplateBuilderEvents();
+  }
+
+  function renderPromptBuilderHTML(loopIdx, loop) {
+    let html = '';
+
+    // Palette
+    html += `<div class="prompt-builder" data-builder-idx="${loopIdx}">`;
+    html += '<div class="prompt-builder-palette">';
+    html += '<div class="prompt-builder-palette-title">Blocks</div>';
+    PROMPT_BLOCK_TYPES.forEach(bt => {
+      html += `<div class="palette-block" data-add-block="${bt.id}" data-builder-loop="${loopIdx}">`;
+      html += `<span class="palette-block-icon">${bt.icon}</span>${esc(bt.label)}`;
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // Sections (active blocks)
+    html += `<div class="prompt-builder-sections" data-sections-loop="${loopIdx}">`;
+    html += `<div class="prompt-builder-sections-title"><span>Sections (${loop.blocks.length})</span></div>`;
+
+    if (loop.blocks.length === 0) {
+      html += '<div class="prompt-builder-empty">Click a block from the palette to add it</div>';
+    } else {
+      loop.blocks.forEach((block, bi) => {
+        html += `<div class="builder-block" draggable="true" data-block-loop="${loopIdx}" data-block-idx="${bi}">`;
+        html += '<div class="builder-block-header">';
+        html += '<span class="builder-block-grip">⠿</span>';
+        html += `<span class="builder-block-label">${esc(block.label)}</span>`;
+        html += '<div class="builder-block-actions">';
+        if (bi > 0) html += `<button title="Move up" data-block-move="up" data-bm-loop="${loopIdx}" data-bm-idx="${bi}">↑</button>`;
+        if (bi < loop.blocks.length - 1) html += `<button title="Move down" data-block-move="down" data-bm-loop="${loopIdx}" data-bm-idx="${bi}">↓</button>`;
+        html += `<button title="Duplicate" data-block-dup data-bd-loop="${loopIdx}" data-bd-idx="${bi}">⧉</button>`;
+        html += `<button title="Remove" data-block-remove data-br-loop="${loopIdx}" data-br-idx="${bi}">&times;</button>`;
+        html += '</div></div>';
+        html += '<div class="builder-block-body">';
+        html += `<textarea data-block-content data-bc-loop="${loopIdx}" data-bc-idx="${bi}">${esc(block.content)}</textarea>`;
+        html += '</div></div>';
+      });
+    }
+    html += '</div>';
+
+    // Live preview
+    html += '<div class="prompt-builder-preview">';
+    html += '<div class="prompt-builder-preview-title">Preview</div>';
+    html += `<pre id="builderPreview-${loopIdx}">${esc(assemblePromptFromBlocks(loop.blocks))}</pre>`;
+    html += '</div>';
+
+    html += '</div>'; // close prompt-builder
+
+    // Toolbar below the builder
+    html += '<div class="prompt-builder-toolbar">';
+    html += `<button class="btn btn-primary" data-builder-done="${loopIdx}" style="font-size:11px;padding:4px 10px">Done</button>`;
+    html += `<button class="btn btn-muted" data-builder-back="${loopIdx}" style="font-size:11px;padding:4px 10px">Back to textarea</button>`;
+    html += '</div>';
+
+    return html;
+  }
+
+  function bindPromptBuilderEvents() {
+    // "Use Builder" buttons — switch from textarea to builder mode
+    content.querySelectorAll('[data-use-builder]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        captureBuilderInputs();
+        const idx = parseInt(btn.dataset.useBuilder);
+        const loop = templateBuilderState.loops[idx];
+        loop.useBuilder = true;
+        // If loop has existing prompt text and no blocks, try to import as a single custom block
+        if (loop.prompt && loop.prompt.trim() && loop.blocks.length === 0) {
+          loop.blocks.push({ id: 'custom', label: 'Custom Section', content: loop.prompt });
+        }
+        renderTemplateBuilder();
+      });
+    });
+
+    // "Done" buttons — compile blocks into prompt text, switch to textarea
+    content.querySelectorAll('[data-builder-done]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        capturePromptBuilderInputs();
+        const idx = parseInt(btn.dataset.builderDone);
+        const loop = templateBuilderState.loops[idx];
+        loop.prompt = assemblePromptFromBlocks(loop.blocks);
+        loop.useBuilder = false;
+        renderTemplateBuilder();
+      });
+    });
+
+    // "Back to textarea" buttons — switch to textarea without compiling
+    content.querySelectorAll('[data-builder-back]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        capturePromptBuilderInputs();
+        const idx = parseInt(btn.dataset.builderBack);
+        const loop = templateBuilderState.loops[idx];
+        // Write blocks to prompt so user doesn't lose work
+        loop.prompt = assemblePromptFromBlocks(loop.blocks);
+        loop.useBuilder = false;
+        renderTemplateBuilder();
+      });
+    });
+
+    // Add block from palette
+    content.querySelectorAll('[data-add-block]').forEach(el => {
+      el.addEventListener('click', () => {
+        capturePromptBuilderInputs();
+        const blockId = el.dataset.addBlock;
+        const loopIdx = parseInt(el.dataset.builderLoop);
+        const blockType = PROMPT_BLOCK_TYPES.find(bt => bt.id === blockId);
+        if (!blockType) return;
+        const loop = templateBuilderState.loops[loopIdx];
+        loop.blocks.push({
+          id: blockType.id,
+          label: blockType.label,
+          content: blockType.skeleton
+        });
+        renderTemplateBuilder();
+      });
+    });
+
+    // Move block up/down
+    content.querySelectorAll('[data-block-move]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        capturePromptBuilderInputs();
+        const loopIdx = parseInt(btn.dataset.bmLoop);
+        const blockIdx = parseInt(btn.dataset.bmIdx);
+        const direction = btn.dataset.blockMove;
+        const blocks = templateBuilderState.loops[loopIdx].blocks;
+        const targetIdx = direction === 'up' ? blockIdx - 1 : blockIdx + 1;
+        if (targetIdx < 0 || targetIdx >= blocks.length) return;
+        [blocks[blockIdx], blocks[targetIdx]] = [blocks[targetIdx], blocks[blockIdx]];
+        renderTemplateBuilder();
+      });
+    });
+
+    // Duplicate block
+    content.querySelectorAll('[data-block-dup]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        capturePromptBuilderInputs();
+        const loopIdx = parseInt(btn.dataset.bdLoop);
+        const blockIdx = parseInt(btn.dataset.bdIdx);
+        const blocks = templateBuilderState.loops[loopIdx].blocks;
+        const clone = { ...blocks[blockIdx] };
+        blocks.splice(blockIdx + 1, 0, clone);
+        renderTemplateBuilder();
+      });
+    });
+
+    // Remove block
+    content.querySelectorAll('[data-block-remove]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        capturePromptBuilderInputs();
+        const loopIdx = parseInt(btn.dataset.brLoop);
+        const blockIdx = parseInt(btn.dataset.brIdx);
+        templateBuilderState.loops[loopIdx].blocks.splice(blockIdx, 1);
+        renderTemplateBuilder();
+      });
+    });
+
+    // Block content editing — update preview live
+    content.querySelectorAll('[data-block-content]').forEach(textarea => {
+      textarea.addEventListener('input', () => {
+        const loopIdx = parseInt(textarea.dataset.bcLoop);
+        const blockIdx = parseInt(textarea.dataset.bcIdx);
+        templateBuilderState.loops[loopIdx].blocks[blockIdx].content = textarea.value;
+        // Update preview
+        const preview = document.getElementById(`builderPreview-${loopIdx}`);
+        if (preview) {
+          preview.textContent = assemblePromptFromBlocks(templateBuilderState.loops[loopIdx].blocks);
+        }
+      });
+    });
+
+    // Drag and drop reordering for blocks
+    content.querySelectorAll('.builder-block[draggable]').forEach(block => {
+      block.addEventListener('dragstart', (e) => {
+        block.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', `${block.dataset.blockLoop}:${block.dataset.blockIdx}`);
+      });
+      block.addEventListener('dragend', () => {
+        block.classList.remove('dragging');
+        content.querySelectorAll('.builder-block.drag-over').forEach(el => el.classList.remove('drag-over'));
+      });
+      block.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        block.classList.add('drag-over');
+      });
+      block.addEventListener('dragleave', () => {
+        block.classList.remove('drag-over');
+      });
+      block.addEventListener('drop', (e) => {
+        e.preventDefault();
+        block.classList.remove('drag-over');
+        const [srcLoop, srcIdx] = e.dataTransfer.getData('text/plain').split(':').map(Number);
+        const destLoop = parseInt(block.dataset.blockLoop);
+        const destIdx = parseInt(block.dataset.blockIdx);
+        if (srcLoop !== destLoop || srcIdx === destIdx) return;
+        capturePromptBuilderInputs();
+        const blocks = templateBuilderState.loops[srcLoop].blocks;
+        const [moved] = blocks.splice(srcIdx, 1);
+        blocks.splice(destIdx, 0, moved);
+        renderTemplateBuilder();
+      });
+    });
+  }
+
+  // Capture prompt builder block textarea values before re-render
+  function capturePromptBuilderInputs() {
+    if (!templateBuilderState) return;
+    content.querySelectorAll('[data-block-content]').forEach(textarea => {
+      const loopIdx = parseInt(textarea.dataset.bcLoop);
+      const blockIdx = parseInt(textarea.dataset.bcIdx);
+      const loop = templateBuilderState.loops[loopIdx];
+      if (loop && loop.blocks[blockIdx]) {
+        loop.blocks[blockIdx].content = textarea.value;
+      }
+    });
   }
 
   function bindTemplateBuilderEvents() {
@@ -3300,6 +3854,9 @@
 
     // Minimap: bidirectional sync — scroll highlights minimap node
     setupMinimapScrollSync();
+
+    // Prompt builder events
+    bindPromptBuilderEvents();
   }
 
   let minimapObserver = null;
@@ -3371,6 +3928,9 @@
         state.loops[idx].prompt = textarea.value;
       }
     });
+
+    // Capture prompt builder block contents
+    capturePromptBuilderInputs();
   }
 
   function updateYamlPreview() {
@@ -3459,6 +4019,13 @@
         return;
       }
     }
+
+    // Assemble blocks into prompt for any loops still in builder mode
+    state.loops.forEach(loop => {
+      if (loop.useBuilder && loop.blocks.length > 0) {
+        loop.prompt = assemblePromptFromBlocks(loop.blocks);
+      }
+    });
 
     const definition = {
       name: state.name.trim(),
