@@ -106,6 +106,8 @@ export interface TemplateLoopDefinition {
   stages: string[];
   completion: string;
   model?: string;
+  claude_args?: string[];
+  skip_permissions?: boolean;
   multi_agent?: { enabled: boolean; max_agents: number; strategy: string; agent_placeholder: string } | false;
   data_files?: string[];
   directories?: string[];
@@ -257,6 +259,13 @@ export function createCustomTemplate(cwd: string, definition: TemplateDefinition
       model: loopDef.model || 'claude-sonnet-4-6',
       cadence: loopDef.cadence ?? 0,
     };
+
+    if (loopDef.claude_args && loopDef.claude_args.length > 0) {
+      loopConfig.claude_args = loopDef.claude_args;
+    }
+    if (loopDef.skip_permissions !== undefined) {
+      loopConfig.skip_permissions = loopDef.skip_permissions;
+    }
 
     if (loopDef.data_files && loopDef.data_files.length > 0) {
       loopConfig.data_files = loopDef.data_files.map(f => `${loopDirName}/${f}`);

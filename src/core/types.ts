@@ -28,6 +28,8 @@ export interface LoopConfig {
   fed_by?: string[];
   multi_agent: MultiAgentConfig | false;
   model?: string;
+  claude_args?: string[];
+  skip_permissions?: boolean;
   lock?: LockConfig;
   worktree?: WorktreeConfig;
   cadence: number;
