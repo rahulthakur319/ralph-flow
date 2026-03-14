@@ -3842,12 +3842,13 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
       html += '<div class="prompt-section" style="margin-top:0;padding-top:0;border-top:none">';
 
       if (showForm) {
-        html += renderPromptConfigForm(si, loop);
+        html += renderPromptConfigForm(si, loop, state.loops);
       } else if (loop.useBuilder) {
         html += renderPromptBuilderHTML(si, loop);
       } else {
         html += `<textarea class="prompt-textarea" data-prompt-idx="${si}" placeholder="Add your prompt here...">${esc(loop.prompt)}</textarea>`;
         html += `<div class="prompt-builder-toolbar">`;
+        html += `<button class="btn btn-muted" data-show-prompt-form="${si}" style="font-size:11px;padding:4px 10px">Regenerate</button>`;
         html += `<button class="btn btn-muted" data-use-builder="${si}" style="font-size:11px;padding:4px 10px">Use Builder</button>`;
         html += `</div>`;
       }
@@ -3871,15 +3872,25 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
     bindTemplateBuilderEvents();
   }
 
-  function renderPromptConfigForm(loopIdx, loop) {
+  function renderPromptConfigForm(loopIdx, loop, allLoops) {
     let html = '<div class="prompt-config-form" data-config-form-idx="' + loopIdx + '">';
+
+    // Check for previous loop's output files as suggestion
+    let inputSuggestion = '';
+    if (loopIdx > 0 && allLoops && allLoops[loopIdx - 1]) {
+      inputSuggestion = (allLoops[loopIdx - 1].outputFiles || '').trim();
+    }
 
     // Per-loop settings
     html += '<div class="prompt-config-section">';
     html += '<div class="prompt-config-section-title">Loop Settings</div>';
     html += '<div class="prompt-config-grid">';
     html += `<div class="form-group"><label class="form-label">Input Files</label>
-      <input class="form-input" data-pcf-field="inputFiles" data-pcf-idx="${loopIdx}" type="text" value="${esc(loop.inputFiles || '')}" placeholder="stories.md, research.md" autocomplete="off"></div>`;
+      <input class="form-input" data-pcf-field="inputFiles" data-pcf-idx="${loopIdx}" type="text" value="${esc(loop.inputFiles || '')}" placeholder="${inputSuggestion ? esc(inputSuggestion) : 'stories.md, research.md'}" autocomplete="off">`;
+    if (inputSuggestion && !(loop.inputFiles || '').trim()) {
+      html += `<div class="io-file-suggestion" data-suggest-input="${loopIdx}" style="font-size:11px;color:var(--text-muted);margin-top:4px;cursor:pointer">Use previous loop output: <span style="color:var(--accent)">${esc(inputSuggestion)}</span></div>`;
+    }
+    html += `</div>`;
     html += `<div class="form-group"><label class="form-label">Output Files</label>
       <input class="form-input" data-pcf-field="outputFiles" data-pcf-idx="${loopIdx}" type="text" value="${esc(loop.outputFiles || '')}" placeholder="tasks.md, results.md" autocomplete="off"></div>`;
     html += `<div class="form-group"><label class="form-label">Multi-agent</label>
@@ -4217,6 +4228,23 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
   }
 
   function bindPromptConfigFormEvents() {
+    // I/O file suggestion clicks (auto-fill from previous loop's output)
+    content.querySelectorAll('[data-suggest-input]').forEach(hint => {
+      hint.addEventListener('click', () => {
+        const idx = parseInt(hint.dataset.suggestInput);
+        if (templateBuilderState && idx > 0 && templateBuilderState.loops[idx - 1]) {
+          const prevOutput = (templateBuilderState.loops[idx - 1].outputFiles || '').trim();
+          if (prevOutput) {
+            templateBuilderState.loops[idx].inputFiles = prevOutput;
+            const inputEl = content.querySelector(`[data-pcf-field="inputFiles"][data-pcf-idx="${idx}"]`);
+            if (inputEl) inputEl.value = prevOutput;
+            hint.remove();
+            updateYamlPreview();
+          }
+        }
+      });
+    });
+
     // Input/output file fields
     content.querySelectorAll('[data-pcf-field]').forEach(input => {
       input.addEventListener('input', () => {
@@ -4224,6 +4252,7 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
         const field = input.dataset.pcfField;
         if (templateBuilderState && templateBuilderState.loops[idx]) {
           templateBuilderState.loops[idx][field] = input.value;
+          updateYamlPreview();
         }
       });
     });
@@ -4818,6 +4847,16 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
       if (loop.entities && loop.entities.length > 0) {
         yaml += `    entities: [${loop.entities.join(', ')}]\n`;
       }
+      const ioFedBy = (loop.inputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+      const ioFeeds = (loop.outputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (ioFedBy.length > 0) {
+        yaml += `    fed_by:\n`;
+        ioFedBy.forEach(f => { yaml += `      - ${f}\n`; });
+      }
+      if (ioFeeds.length > 0) {
+        yaml += `    feeds:\n`;
+        ioFeeds.forEach(f => { yaml += `      - ${f}\n`; });
+      }
     });
 
     return yaml;
@@ -4878,6 +4917,14 @@ curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/deci
         }
         if (loop.entities && loop.entities.length > 0) {
           loopDef.entities = loop.entities;
+        }
+        const fedByList = (loop.inputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+        const feedsList = (loop.outputFiles || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (fedByList.length > 0) {
+          loopDef.fed_by = fedByList;
+        }
+        if (feedsList.length > 0) {
+          loopDef.feeds = feedsList;
         }
         if (loop.prompt && loop.prompt.trim()) {
           loopDef.prompt = loop.prompt;
