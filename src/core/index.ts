@@ -19,6 +19,8 @@ export type {
   TemplateLoopDefinition,
   TemplateInfo,
 } from './template.js';
+export { generatePromptFromConfig, buildPromptLoopConfig } from './prompt-generator.js';
+export type { PromptLoopConfig, StageConfig } from './prompt-generator.js';
 export type {
   RalphFlowConfig,
   LoopConfig,

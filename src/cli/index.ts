@@ -6,6 +6,7 @@ import { runCommand } from './run.js';
 import { e2eCommand } from './e2e.js';
 import { statusCommand } from './status.js';
 import { dashboardCommand } from './dashboard.js';
+import { createTemplateCommand } from './create-template.js';
 
 export const program = new Command()
   .name('ralphflow')
@@ -16,6 +17,7 @@ export const program = new Command()
   .addCommand(e2eCommand)
   .addCommand(statusCommand)
   .addCommand(dashboardCommand)
+  .addCommand(createTemplateCommand)
   .action(async () => {
     const port = 4242;
     const { startDashboard } = await import('../dashboard/server.js');
