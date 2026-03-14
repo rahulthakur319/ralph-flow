@@ -8,6 +8,8 @@ Multi-agent AI workflow orchestration for [Claude Code](https://docs.anthropic.c
 
 Define pipelines as loops, coordinate parallel agents via file-based trackers, and ship structured work — from single-agent interactive sessions to multi-agent autonomous execution.
 
+**[Documentation](https://rahulthakur319.github.io/ralph-flow/)** | **[npm](https://www.npmjs.com/package/ralphflow)** | **[GitHub](https://github.com/rahulthakur319/ralph-flow)**
+
 ## Quick Start
 
 ```bash
