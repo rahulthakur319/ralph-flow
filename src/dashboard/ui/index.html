@@ -1168,10 +1168,10 @@
   .loop-card-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 8px;
     margin-bottom: 12px;
   }
-  .loop-card-title { font-size: 13px; font-weight: 600; }
+  .loop-card-title { font-size: 13px; font-weight: 600; flex: 1; }
   .loop-card-remove {
     background: none;
     border: none;
@@ -3341,8 +3341,9 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     html += '<div class="loop-cards">';
 
     state.loops.forEach((loop, i) => {
-      html += `<div class="loop-card" data-loop-index="${i}">`;
+      html += `<div class="loop-card" data-loop-index="${i}" draggable="true">`;
       html += `<div class="loop-card-header">
+        <span class="loop-card-drag-handle" title="Drag to reorder">⠿</span>
         <span class="loop-card-title">Loop ${i + 1}</span>
         ${state.loops.length > 1 ? `<button class="loop-card-remove" data-remove-loop="${i}">&times;</button>` : ''}
       </div>`;
@@ -3855,6 +3856,9 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     // Minimap: bidirectional sync — scroll highlights minimap node
     setupMinimapScrollSync();
 
+    // Drag-and-drop reordering for minimap nodes and loop cards
+    setupBuilderDragAndDrop();
+
     // Prompt builder events
     bindPromptBuilderEvents();
   }
@@ -3894,6 +3898,103 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     });
 
     cards.forEach(card => minimapObserver.observe(card));
+  }
+
+  function setupBuilderDragAndDrop() {
+    let dragSrcIdx = null;
+    let dragSource = null; // 'minimap' or 'card'
+
+    function reorderLoops(fromIdx, toIdx) {
+      if (fromIdx === toIdx) return;
+      captureBuilderInputs();
+      const loops = templateBuilderState.loops;
+      const [moved] = loops.splice(fromIdx, 1);
+      loops.splice(toIdx, 0, moved);
+      renderTemplateBuilder();
+    }
+
+    // Minimap node drag events
+    content.querySelectorAll('.builder-minimap-node[draggable="true"]').forEach(node => {
+      node.addEventListener('dragstart', (e) => {
+        dragSrcIdx = parseInt(node.dataset.minimapIdx);
+        dragSource = 'minimap';
+        node.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragSrcIdx);
+      });
+
+      node.addEventListener('dragend', () => {
+        node.classList.remove('dragging');
+        content.querySelectorAll('.builder-minimap-node.drag-over').forEach(n => n.classList.remove('drag-over'));
+        dragSrcIdx = null;
+        dragSource = null;
+      });
+
+      node.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const targetIdx = parseInt(node.dataset.minimapIdx);
+        if (targetIdx !== dragSrcIdx) {
+          node.classList.add('drag-over');
+        }
+      });
+
+      node.addEventListener('dragleave', () => {
+        node.classList.remove('drag-over');
+      });
+
+      node.addEventListener('drop', (e) => {
+        e.preventDefault();
+        node.classList.remove('drag-over');
+        const toIdx = parseInt(node.dataset.minimapIdx);
+        if (dragSrcIdx !== null && dragSrcIdx !== toIdx) {
+          reorderLoops(dragSrcIdx, toIdx);
+        }
+      });
+    });
+
+    // Loop card drag events
+    content.querySelectorAll('.loop-card[draggable="true"]').forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        dragSrcIdx = parseInt(card.dataset.loopIndex);
+        dragSource = 'card';
+        card.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragSrcIdx);
+      });
+
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        content.querySelectorAll('.loop-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+        dragSrcIdx = null;
+        dragSource = null;
+      });
+
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const targetIdx = parseInt(card.dataset.loopIndex);
+        if (targetIdx !== dragSrcIdx) {
+          card.classList.add('drag-over');
+        }
+      });
+
+      card.addEventListener('dragleave', (e) => {
+        // Only remove if leaving the card entirely (not entering a child)
+        if (!card.contains(e.relatedTarget)) {
+          card.classList.remove('drag-over');
+        }
+      });
+
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        card.classList.remove('drag-over');
+        const toIdx = parseInt(card.dataset.loopIndex);
+        if (dragSrcIdx !== null && dragSrcIdx !== toIdx) {
+          reorderLoops(dragSrcIdx, toIdx);
+        }
+      });
+    });
   }
 
   // Capture current input values into state before re-render
