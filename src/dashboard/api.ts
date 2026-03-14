@@ -16,6 +16,7 @@ import {
   listCustomTemplates,
   createCustomTemplate,
   deleteCustomTemplate,
+  cloneBuiltInTemplate,
   validateTemplateName,
 } from '../core/template.js';
 import type { TemplateDefinition } from '../core/template.js';
@@ -607,6 +608,61 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
     }
 
     return c.json({ ok: true, templateName: name });
+  });
+
+  // POST /api/templates/:name/clone — clone a built-in template into a custom template
+  api.post('/api/templates/:name/clone', async (c) => {
+    const sourceName = c.req.param('name');
+
+    // Path safety
+    if (sourceName.includes('..') || sourceName.includes('/') || sourceName.includes('\\')) {
+      return c.json({ error: 'Invalid name: must not contain "..", "/", or "\\"' }, 400);
+    }
+
+    // Source must be a built-in template
+    if (!(BUILT_IN_TEMPLATES as readonly string[]).includes(sourceName)) {
+      return c.json({ error: `"${sourceName}" is not a built-in template. Only built-in templates can be cloned.` }, 400);
+    }
+
+    let body: { newName?: string };
+    try {
+      body = await c.req.json<{ newName?: string }>();
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+
+    const { newName } = body;
+    if (!newName || newName.trim().length === 0) {
+      return c.json({ error: 'newName is required' }, 400);
+    }
+
+    const validation = validateTemplateName(newName.trim());
+    if (!validation.valid) {
+      return c.json({ error: validation.error }, 400);
+    }
+
+    // Check for existing custom template with that name
+    const customDir = join(cwd, '.ralph-flow', '.templates', newName.trim());
+    if (existsSync(customDir)) {
+      return c.json({ error: `Template "${newName.trim()}" already exists` }, 409);
+    }
+
+    try {
+      cloneBuiltInTemplate(cwd, sourceName, newName.trim());
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('already exists')) {
+        return c.json({ error: msg }, 409);
+      }
+      return c.json({ error: `Clone failed: ${msg}` }, 500);
+    }
+
+    return c.json({
+      ok: true,
+      source: sourceName,
+      templateName: newName.trim(),
+      message: `Template "${sourceName}" cloned as "${newName.trim()}"`,
+    }, 201);
   });
 
   // POST /api/notification — receive a notification from a Claude hook

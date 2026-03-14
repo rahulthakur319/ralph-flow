@@ -11,6 +11,7 @@ export {
   listCustomTemplates,
   createCustomTemplate,
   deleteCustomTemplate,
+  cloneBuiltInTemplate,
   validateTemplateName,
 } from './template.js';
 export type {

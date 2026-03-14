@@ -326,6 +326,44 @@ export function createCustomTemplate(cwd: string, definition: TemplateDefinition
 }
 
 /**
+ * Clone a built-in template into a custom template.
+ * Copies the entire directory tree and patches the name in ralphflow.yaml.
+ */
+export function cloneBuiltInTemplate(cwd: string, sourceName: string, newName: string): void {
+  // Validate source is a built-in template
+  if (!(BUILT_IN_TEMPLATES as readonly string[]).includes(sourceName)) {
+    throw new Error(`"${sourceName}" is not a built-in template. Only built-in templates can be cloned.`);
+  }
+
+  // Validate new name
+  const validation = validateTemplateName(newName);
+  if (!validation.valid) {
+    throw new Error(validation.error!);
+  }
+
+  // Check target doesn't already exist
+  const customDir = join(cwd, '.ralph-flow', '.templates', newName);
+  if (existsSync(customDir)) {
+    throw new Error(`Template "${newName}" already exists`);
+  }
+
+  // Resolve source template path
+  const sourceDir = resolveTemplatePath(sourceName);
+
+  // Copy entire directory tree
+  mkdirSync(customDir, { recursive: true });
+  cpSync(sourceDir, customDir, { recursive: true });
+
+  // Patch the name field in the cloned ralphflow.yaml
+  const yamlPath = join(customDir, 'ralphflow.yaml');
+  if (existsSync(yamlPath)) {
+    const content = readFileSync(yamlPath, 'utf-8');
+    const patched = content.replace(/^name:\s*.+$/m, `name: ${newName}`);
+    writeFileSync(yamlPath, patched, 'utf-8');
+  }
+}
+
+/**
  * Delete a custom template. Built-in templates are protected.
  */
 export function deleteCustomTemplate(cwd: string, name: string): void {
