@@ -1,6 +1,6 @@
 {
   "name": "ralphflow",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Multi-agent AI workflow orchestration framework for Claude Code. Define pipelines as loops, coordinate parallel agents, and ship structured work.",
   "type": "module",
   "bin": {
