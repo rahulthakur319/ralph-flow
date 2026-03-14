@@ -115,6 +115,32 @@
     background: var(--bg-hover);
     color: var(--text-dim);
   }
+  .sidebar-progress {
+    padding: 2px 16px 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sidebar-progress-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .sidebar-progress-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+  .sidebar-progress-text {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-muted);
+    min-width: 28px;
+    text-align: right;
+  }
 
   /* Content */
   .content {
@@ -1455,9 +1481,14 @@
     let html = '';
     for (const app of apps) {
       const appActive = selectedApp && selectedApp.appName === app.appName;
+      const appProgress = calculatePipelineProgress(app.loops);
       html += `<div class="sidebar-item app-item${appActive ? ' active' : ''}" data-app="${esc(app.appName)}">
         ${esc(app.appName)}
         <span class="badge">${esc(app.appType)}</span>
+      </div>`;
+      html += `<div class="sidebar-progress">
+        <div class="sidebar-progress-bar"><div class="sidebar-progress-fill" style="width:${appProgress.percentage}%"></div></div>
+        <span class="sidebar-progress-text">${appProgress.percentage}%</span>
       </div>`;
       if (app.loops) {
         for (const loop of app.loops) {
