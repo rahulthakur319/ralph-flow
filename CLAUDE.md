@@ -34,6 +34,18 @@ src/
     ├── claude-md.template.md — CLAUDE.md template with {{VAR}} substitution
     ├── code-implementation/  — Story → Tasks → Delivery (3 loops, multi-agent on tasks)
     └── research/             — Discovery → Research → Story → Document (4 loops, multi-agent on research)
+docs/
+├── .vitepress/config.ts     — VitePress configuration (nav, sidebar, dark theme, local search)
+├── index.md                 — Homepage with hero section and feature cards
+├── guide/
+│   ├── quick-start.md       — Install, init, run, dashboard walkthrough
+│   ├── core-concepts.md     — Loops, trackers, pipelines, multi-agent, completion detection
+│   └── dashboard.md         — Web dashboard features and usage
+└── reference/
+    ├── configuration.md     — ralphflow.yaml schema reference
+    ├── templates.md         — Built-in and custom template documentation
+    └── api.md               — REST API and WebSocket endpoint reference
+.github/workflows/docs.yml  — GitHub Actions: build VitePress + deploy to GitHub Pages
 ```
 
 ## Tech Stack
@@ -44,6 +56,7 @@ src/
 - **Database:** better-sqlite3 with WAL mode for loop state persistence
 - **Web:** Hono + @hono/node-server (HTTP), ws (WebSocket), chokidar (file watching)
 - **Utilities:** chalk (terminal colors), cli-table3 (ASCII tables), yaml (YAML parsing), simple-git
+- **Docs:** VitePress (static site generation for documentation)
 - **Target:** Node.js >= 18
 
 ## Dev Commands
@@ -53,6 +66,8 @@ npm run build        # tsup → dist/ (ESM, node18 target)
 npm run dev          # tsup --watch
 npx tsc --noEmit     # Typecheck (no emit)
 npm run lint         # eslint src/
+npm run docs:dev     # VitePress local dev server
+npm run docs:build   # VitePress → docs/.vitepress/dist/
 ```
 
 ## CLI Command Tree
@@ -173,6 +188,9 @@ The app detail view has a "Loops" / "Archives" tab bar below the app header. The
 
 ### Dashboard Notification UI (ui/index.html)
 The Interactive panel (left column, top) renders per-loop attention notifications. Notifications are stored in `notificationsList` (client-side array hydrated from `GET /api/notifications` on load). Each card shows timestamp, message, and dismiss (X) button. Sidebar loop items display a `.notif-badge` count for undismissed notifications. Browser `Notification` API permission is requested on first notification; desktop toasts fire when the tab is in the background. An audible two-note chime (Web Audio API, ~250ms) plays on each notification — AudioContext is lazily initialized on first user interaction to satisfy browser autoplay policies.
+
+### Documentation Site (docs/)
+VitePress-powered documentation site deployed to GitHub Pages via `.github/workflows/docs.yml`. The site is configured in `docs/.vitepress/config.ts` with nav bar (Guide, Reference, version dropdown), sidebar groups (Getting Started, Using RalphFlow, Reference), local search, dark theme, and edit links. The `base` is set to `/ralph-flow/` matching the GitHub Pages URL. Pages live in `docs/guide/` (quick-start, core-concepts, dashboard) and `docs/reference/` (configuration, templates, api). The GitHub Actions workflow triggers on push to main, builds with `npm run docs:build`, and deploys via `actions/deploy-pages`. Local development: `npm run docs:dev`.
 
 ## Conventions
 
