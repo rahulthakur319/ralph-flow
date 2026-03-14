@@ -1297,6 +1297,85 @@
   }
   .prompt-textarea:focus { border-color: var(--accent); outline: none; }
   .prompt-textarea::placeholder { color: var(--text-muted); }
+
+  /* Builder pipeline minimap */
+  .builder-minimap {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 12px 0;
+    overflow-x: auto;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+    margin-bottom: 4px;
+  }
+  .builder-minimap-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+  .builder-minimap-node:hover { border-color: var(--text-dim); }
+  .builder-minimap-node.active {
+    border-color: var(--accent);
+    background: rgba(88, 166, 255, 0.05);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .builder-minimap-node .minimap-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .builder-minimap-node .minimap-index {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-muted);
+  }
+  .builder-minimap-connector {
+    width: 24px;
+    height: 2px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+  .builder-minimap-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    transition: border-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+    min-width: 40px;
+  }
+  .builder-minimap-add:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .loop-card.highlighted {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
 </style>
 </head>
 <body>
@@ -2904,6 +2983,26 @@
       <input class="form-input" id="tplDesc" type="text" value="${esc(state.description)}" placeholder="Pipeline description" autocomplete="off"></div>`;
     html += '</div></div>';
 
+    // Pipeline minimap
+    html += '<div class="builder-section">';
+    html += '<div class="builder-section-title">Pipeline</div>';
+    html += '<div class="builder-minimap" id="builderMinimap">';
+    state.loops.forEach((loop, i) => {
+      if (i > 0) {
+        html += '<div class="builder-minimap-connector"></div>';
+      }
+      const label = loop.name || `Loop ${i + 1}`;
+      html += `<div class="builder-minimap-node" data-minimap-idx="${i}">
+        <span class="minimap-label">${esc(label)}</span>
+        <span class="minimap-index">${i + 1}</span>
+      </div>`;
+    });
+    if (state.loops.length > 0) {
+      html += '<div class="builder-minimap-connector"></div>';
+    }
+    html += '<button class="builder-minimap-add" id="minimapAddBtn" title="Add loop">+</button>';
+    html += '</div></div>';
+
     // Loops
     html += '<div class="builder-section">';
     html += '<div class="builder-section-title">Loops</div>';
@@ -3080,6 +3179,11 @@
         } else {
           loop[field] = input.value;
         }
+        // Live-update minimap label when loop name changes
+        if (field === 'name') {
+          const minimapNode = content.querySelector(`.builder-minimap-node[data-minimap-idx="${idx}"] .minimap-label`);
+          if (minimapNode) minimapNode.textContent = input.value || `Loop ${idx + 1}`;
+        }
         updateYamlPreview();
       });
     });
@@ -3152,6 +3256,79 @@
         templateBuilderState.loops[idx].prompt = textarea.value;
       });
     });
+
+    // Minimap: click node → scroll to loop card + highlight
+    content.querySelectorAll('.builder-minimap-node').forEach(node => {
+      node.addEventListener('click', () => {
+        const idx = parseInt(node.dataset.minimapIdx);
+        const card = content.querySelector(`.loop-card[data-loop-index="${idx}"]`);
+        if (!card) return;
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Highlight the card briefly
+        content.querySelectorAll('.loop-card.highlighted').forEach(c => c.classList.remove('highlighted'));
+        card.classList.add('highlighted');
+        setTimeout(() => card.classList.remove('highlighted'), 1500);
+        // Update active minimap node
+        content.querySelectorAll('.builder-minimap-node.active').forEach(n => n.classList.remove('active'));
+        node.classList.add('active');
+      });
+    });
+
+    // Minimap: add button
+    const minimapAddBtn = document.getElementById('minimapAddBtn');
+    if (minimapAddBtn) {
+      minimapAddBtn.addEventListener('click', () => {
+        captureBuilderInputs();
+        templateBuilderState.loops.push(createEmptyLoop());
+        renderTemplateBuilder();
+        // Scroll to the new card after render
+        setTimeout(() => {
+          const cards = content.querySelectorAll('.loop-card');
+          const last = cards[cards.length - 1];
+          if (last) last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+      });
+    }
+
+    // Minimap: bidirectional sync — scroll highlights minimap node
+    setupMinimapScrollSync();
+  }
+
+  let minimapObserver = null;
+
+  function setupMinimapScrollSync() {
+    // Clean up previous observer
+    if (minimapObserver) { minimapObserver.disconnect(); minimapObserver = null; }
+
+    const cards = content.querySelectorAll('.loop-card[data-loop-index]');
+    if (cards.length === 0) return;
+
+    // Use the content area as the scroll root
+    const scrollRoot = content;
+
+    minimapObserver = new IntersectionObserver((entries) => {
+      // Find the most visible card
+      let bestEntry = null;
+      let bestRatio = 0;
+      for (const entry of entries) {
+        if (entry.isIntersecting && entry.intersectionRatio > bestRatio) {
+          bestRatio = entry.intersectionRatio;
+          bestEntry = entry;
+        }
+      }
+      if (bestEntry) {
+        const idx = bestEntry.target.dataset.loopIndex;
+        const minimapNodes = content.querySelectorAll('.builder-minimap-node');
+        minimapNodes.forEach(n => {
+          n.classList.toggle('active', n.dataset.minimapIdx === idx);
+        });
+      }
+    }, {
+      root: scrollRoot,
+      threshold: [0, 0.25, 0.5, 0.75, 1.0]
+    });
+
+    cards.forEach(card => minimapObserver.observe(card));
   }
 
   // Capture current input values into state before re-render
