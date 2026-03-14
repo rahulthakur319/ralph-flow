@@ -187,6 +187,24 @@
   .pipeline-node .node-status.complete { background: rgba(63,185,80,0.15); color: var(--green); }
   .pipeline-node .node-status.running { background: rgba(88,166,255,0.15); color: var(--blue); }
   .pipeline-node .node-status.pending { background: rgba(139,148,158,0.1); color: var(--text-muted); }
+  .pipeline-node .node-status-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pipeline-node .node-model-sep {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+  .pipeline-node .node-model {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-dim);
+  }
+  .pipeline-node .node-model-default {
+    font-style: italic;
+    opacity: 0.6;
+  }
   .pipeline-connector {
     width: 32px;
     height: 2px;
@@ -1517,9 +1535,14 @@
       if (i > 0) html += '<div class="pipeline-connector"></div>';
       const statusClass = getLoopStatusClass(loop);
       const isSelected = loop.key === selectedLoop;
+      const modelDisplay = formatModelName(loop.model);
       html += `<div class="pipeline-node${isSelected ? ' selected' : ''}" data-loop="${esc(loop.key)}">
         <span class="node-name">${esc(loop.name)}</span>
-        <span class="node-status ${statusClass}">${statusClass}</span>
+        <span class="node-status-row">
+          <span class="node-status ${statusClass}">${statusClass}</span>
+          <span class="node-model-sep">&middot;</span>
+          <span class="node-model${modelDisplay ? '' : ' node-model-default'}">${modelDisplay ? esc(modelDisplay) : 'default'}</span>
+        </span>
       </div>`;
     });
     html += '</div></div>';
@@ -2027,6 +2050,11 @@
     }
 
     return html;
+  }
+
+  function formatModelName(model) {
+    if (!model) return null;
+    return model.replace(/^claude-/, '');
   }
 
   function getLoopStatusClass(loop) {
