@@ -1861,6 +1861,8 @@
     selectedApp = app;
     selectedLoop = app.loops.length > 0 ? app.loops[0].key : null;
     promptDirty = false;
+    promptOriginal = '';
+    promptViewMode = 'read';
     activeEditTab = 'prompt';
     cachedPromptValue = null;
     activeAppTab = 'loops';
@@ -1877,6 +1879,8 @@
   function selectLoop(loopKey) {
     selectedLoop = loopKey;
     promptDirty = false;
+    promptOriginal = '';
+    promptViewMode = 'read';
     activeEditTab = 'prompt';
     cachedPromptValue = null;
     renderSidebar();
