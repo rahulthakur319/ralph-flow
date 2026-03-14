@@ -205,6 +205,32 @@
     font-style: italic;
     opacity: 0.6;
   }
+  .pipeline-node .node-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    margin-top: 2px;
+  }
+  .pipeline-node .node-progress-text {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-muted);
+  }
+  .pipeline-node .node-progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .pipeline-node .node-progress-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
   .pipeline-connector {
     width: 32px;
     height: 2px;
@@ -1222,6 +1248,29 @@
     padding-top: 12px;
     border-top: 1px solid var(--border);
   }
+  .prompt-section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .prompt-textarea {
+    width: 100%;
+    min-height: 160px;
+    max-height: 400px;
+    margin-top: 8px;
+    padding: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+  .prompt-textarea:focus { border-color: var(--accent); outline: none; }
+  .prompt-textarea::placeholder { color: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -1534,6 +1583,9 @@
     // --- Loops tab content ---
 
     // Pipeline
+    const pipelineProgress = calculatePipelineProgress(app.loops);
+    const progressByKey = {};
+    pipelineProgress.perLoop.forEach(p => { progressByKey[p.key] = p; });
     html += '<div class="section"><div class="section-title">Pipeline</div><div class="pipeline">';
     app.loops.forEach((loop, i) => {
       if (i > 0) {
@@ -1543,6 +1595,9 @@
       const statusClass = getLoopStatusClass(loop);
       const isSelected = loop.key === selectedLoop;
       const modelDisplay = formatModelName(loop.model);
+      const lp = progressByKey[loop.key] || { completed: 0, total: 0, fraction: 0 };
+      const progressText = lp.total > 0 ? `${lp.completed}/${lp.total}` : '\u2014';
+      const progressPct = Math.round(lp.fraction * 100);
       html += `<div class="pipeline-node${isSelected ? ' selected' : ''}" data-loop="${esc(loop.key)}">
         <span class="node-name">${esc(loop.name)}</span>
         <span class="node-status-row">
@@ -1550,6 +1605,10 @@
           <span class="node-model-sep">&middot;</span>
           <span class="node-model${modelDisplay ? '' : ' node-model-default'}">${modelDisplay ? esc(modelDisplay) : 'default'}</span>
         </span>
+        <div class="node-progress">
+          <span class="node-progress-text">${progressText}</span>
+          <div class="node-progress-bar"><div class="node-progress-fill" style="width:${progressPct}%"></div></div>
+        </div>
       </div>`;
     });
     html += '</div></div>';
@@ -2731,7 +2790,9 @@
       agent_placeholder: '{{AGENT_NAME}}',
       data_files: [],
       entities: [],
-      showOptional: false
+      showOptional: false,
+      showPrompt: false,
+      prompt: ''
     };
   }
 
@@ -2890,6 +2951,15 @@
         html += '</div></div>';
       }
 
+      // Prompt section toggle
+      html += `<button class="optional-toggle" data-toggle-prompt="${i}">${loop.showPrompt ? 'Hide prompt' : 'Show prompt'}</button>`;
+
+      if (loop.showPrompt) {
+        html += '<div class="prompt-section">';
+        html += `<textarea class="prompt-textarea" data-prompt-idx="${i}" placeholder="Add your prompt here...">${esc(loop.prompt)}</textarea>`;
+        html += '</div>';
+      }
+
       html += '</div>'; // close loop-card
     });
 
@@ -3033,6 +3103,24 @@
         renderTemplateBuilder();
       });
     });
+
+    // Prompt section toggle
+    content.querySelectorAll('[data-toggle-prompt]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        captureBuilderInputs();
+        const idx = parseInt(btn.dataset.togglePrompt);
+        templateBuilderState.loops[idx].showPrompt = !templateBuilderState.loops[idx].showPrompt;
+        renderTemplateBuilder();
+      });
+    });
+
+    // Prompt textarea input
+    content.querySelectorAll('.prompt-textarea').forEach(textarea => {
+      textarea.addEventListener('input', () => {
+        const idx = parseInt(textarea.dataset.promptIdx);
+        templateBuilderState.loops[idx].prompt = textarea.value;
+      });
+    });
   }
 
   // Capture current input values into state before re-render
@@ -3057,6 +3145,14 @@
         loop.entities = input.value.split(',').map(s => s.trim()).filter(Boolean);
       } else {
         loop[field] = input.value;
+      }
+    });
+
+    // Capture prompt textareas
+    content.querySelectorAll('.prompt-textarea').forEach(textarea => {
+      const idx = parseInt(textarea.dataset.promptIdx);
+      if (state.loops[idx]) {
+        state.loops[idx].prompt = textarea.value;
       }
     });
   }
@@ -3171,6 +3267,9 @@
         }
         if (loop.entities && loop.entities.length > 0) {
           loopDef.entities = loop.entities;
+        }
+        if (loop.prompt && loop.prompt.trim()) {
+          loopDef.prompt = loop.prompt;
         }
         return loopDef;
       })
