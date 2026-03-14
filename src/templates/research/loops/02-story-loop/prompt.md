@@ -96,6 +96,28 @@ If all stories written: `<promise>ALL STORIES WRITTEN</promise>`
 
 ---
 
+## Decision Reporting Protocol
+
+When you make a substantive decision a human reviewer would want to know about, report it to the dashboard:
+
+**When to report:**
+- Theme grouping decisions (why findings were clustered into specific stories)
+- Narrative framing choices (how you chose to frame the story's angle)
+- Evidence weighting (which data points to emphasize vs. downplay)
+- Audience adaptation decisions (how you adjusted tone or depth for the target audience)
+- Scope decisions (what to include/exclude from a story's narrative)
+
+**How to report:**
+```bash
+curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/decision?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP" -H 'Content-Type: application/json' -d '{"item":"STORY-{N}","agent":"story-loop","decision":"{one-line summary}","reasoning":"{why this choice}"}'
+```
+
+**Do NOT report** routine operations: picking the next story, updating tracker, stage transitions. Only report substantive choices that affect the story content.
+
+**Best-effort only:** If the dashboard is unreachable (curl fails), continue working normally. Decision reporting must never block or delay your work.
+
+---
+
 ## Rules
 
 - One story at a time. Both stages run in one iteration, one `kill` at the end.

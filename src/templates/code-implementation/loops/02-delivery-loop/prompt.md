@@ -92,6 +92,27 @@ After resolving all feedback:
 
 ---
 
+## Decision Reporting Protocol
+
+When you make a substantive decision a human reviewer would want to know about, report it to the dashboard:
+
+**When to report:**
+- Feedback categorization decisions (classifying feedback as BUG vs. CHANGE)
+- Scope decisions during bug fixes (what to fix now vs. defer to a new story)
+- Presentation choices (how you framed or organized the walkthrough)
+- Trade-off resolutions when multiple feedback items conflict
+
+**How to report:**
+```bash
+curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/decision?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP" -H 'Content-Type: application/json' -d '{"item":"STORY-{N}","agent":"delivery-loop","decision":"{one-line summary}","reasoning":"{why this choice}"}'
+```
+
+**Do NOT report** routine operations: picking the next story, updating tracker, phase transitions. Only report substantive choices that affect the delivery outcome.
+
+**Best-effort only:** If the dashboard is unreachable (curl fails), continue working normally. Decision reporting must never block or delay your work.
+
+---
+
 ## Rules
 
 - One STORY at a time. All 3 phases run in one iteration, one `kill` at the end.

@@ -170,6 +170,28 @@ After completing ANY stage, exit: `kill -INT $PPID`
 
 If Topics Queue in tracker is empty: read `topics.md`, scan `## TOPIC-{N}:` headers + `**Depends on:**` tags, populate queue with `{agent: -, status: pending|blocked}` metadata, then start.
 
+## Decision Reporting Protocol
+
+When you make a substantive decision a human reviewer would want to know about, report it to the dashboard:
+
+**When to report:**
+- Research direction choices (which angles to pursue vs. skip)
+- Source credibility judgments (why you trusted or dismissed a source)
+- Scope boundary decisions (what's in/out for this topic's investigation)
+- Conflicting evidence resolution (how you weighed contradictory findings)
+- Gap identification decisions (what couldn't be found and whether to flag it)
+
+**How to report:**
+```bash
+curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/decision?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP" -H 'Content-Type: application/json' -d '{"item":"TOPIC-{N}","agent":"{{AGENT_NAME}}","decision":"{one-line summary}","reasoning":"{why this choice}"}'
+```
+
+**Do NOT report** routine operations: claiming a topic, updating heartbeat, stage transitions, waiting for blocked topics. Only report substantive choices that affect the research findings.
+
+**Best-effort only:** If the dashboard is unreachable (curl fails), continue working normally. Decision reporting must never block or delay your work.
+
+---
+
 ## Rules
 
 - One topic at a time per agent. One stage per iteration.

@@ -134,6 +134,28 @@ If Stories Queue in tracker is empty: read `stories.md`, scan `## STORY-{N}:` he
 
 ---
 
+## Decision Reporting Protocol
+
+When you make a substantive decision a human reviewer would want to know about, report it to the dashboard:
+
+**When to report:**
+- Scope boundary decisions (included/excluded functionality from a story)
+- Approach choices (why you decomposed tasks one way vs. another)
+- Trade-off resolutions (prioritizing one concern over another)
+- Interpretation of ambiguous requirements (how you resolved unclear user intent)
+- Self-answered clarification questions (questions you could have asked but resolved yourself)
+
+**How to report:**
+```bash
+curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/decision?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP" -H 'Content-Type: application/json' -d '{"item":"STORY-{N}","agent":"story-loop","decision":"{one-line summary}","reasoning":"{why this choice}"}'
+```
+
+**Do NOT report** routine operations: picking the next story, updating tracker, stage transitions, heartbeat updates. Only report substantive choices that affect the work product.
+
+**Best-effort only:** If the dashboard is unreachable (curl fails), continue working normally. Decision reporting must never block or delay your work.
+
+---
+
 ## Rules
 
 - One story at a time. All 3 stages run in one iteration, one `kill` at the end.

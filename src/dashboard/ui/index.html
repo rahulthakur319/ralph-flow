@@ -3578,6 +3578,30 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
 - **Multi-agent: never touch another agent's in_progress task. Coordinate via tracker.md.**`
     },
     {
+      id: 'decision-reporting',
+      label: 'Decision Reporting',
+      icon: '📢',
+      skeleton: `## Decision Reporting Protocol
+
+When you make a substantive decision a human reviewer would want to know about, report it to the dashboard:
+
+**When to report:**
+- Scope boundary decisions (what's included/excluded)
+- Approach choices (implementation strategy, design decisions)
+- Trade-off resolutions (prioritizing one concern over another)
+- Interpretation of ambiguous requirements
+- Self-answered clarification questions
+
+**How to report:**
+\`\`\`bash
+curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/decision?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP" -H 'Content-Type: application/json' -d '{"item":"{ITEM_ID}","agent":"{agent_name}","decision":"{one-line summary}","reasoning":"{why this choice}"}'
+\`\`\`
+
+**Do NOT report** routine operations (claiming tasks, updating heartbeat, stage transitions). Only report substantive choices that affect the work product.
+
+**Best-effort only:** If the dashboard is unreachable (curl fails), continue working normally.`
+    },
+    {
       id: 'custom',
       label: 'Custom Section',
       icon: '✎',

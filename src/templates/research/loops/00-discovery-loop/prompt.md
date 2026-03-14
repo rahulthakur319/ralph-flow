@@ -107,6 +107,28 @@ If all topics have been discovered and queue is empty: `<promise>ALL TOPICS DISC
 
 ---
 
+## Decision Reporting Protocol
+
+When you make a substantive decision a human reviewer would want to know about, report it to the dashboard:
+
+**When to report:**
+- Scope boundary decisions (what's in/out of the research scope)
+- Topic decomposition choices (why topics were split a certain way)
+- Priority assignments (why a topic is high vs. medium vs. low priority)
+- Depth decisions (surface vs. deep investigation for specific areas)
+- Dependency structure choices (why certain topics must precede others)
+
+**How to report:**
+```bash
+curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/decision?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP" -H 'Content-Type: application/json' -d '{"item":"TOPIC-{N}","agent":"discovery-loop","decision":"{one-line summary}","reasoning":"{why this choice}"}'
+```
+
+**Do NOT report** routine operations: updating tracker, stage transitions. Only report substantive choices that affect the research direction.
+
+**Best-effort only:** If the dashboard is unreachable (curl fails), continue working normally. Decision reporting must never block or delay your work.
+
+---
+
 ## Rules
 
 - One research brief at a time. All 3 stages run in one iteration, one `kill` at the end.

@@ -109,6 +109,28 @@ Read `.ralph-flow/{{APP_NAME}}/03-document-loop/tracker.md` FIRST to determine w
 
 ---
 
+## Decision Reporting Protocol
+
+When you make a substantive decision a human reviewer would want to know about, report it to the dashboard:
+
+**When to report:**
+- Document structure decisions (how you organized the overall narrative)
+- Story ordering choices (why stories were arranged in a particular sequence)
+- Format decisions (how you adapted content for the chosen output format)
+- Editorial choices (what to include in the executive summary, what to put in appendices)
+- Audience adaptation decisions (how you adjusted tone or depth)
+
+**How to report:**
+```bash
+curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/decision?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP" -H 'Content-Type: application/json' -d '{"item":"DOCUMENT","agent":"document-loop","decision":"{one-line summary}","reasoning":"{why this choice}"}'
+```
+
+**Do NOT report** routine operations: reading files, updating tracker. Only report substantive choices that affect the final document.
+
+**Best-effort only:** If the dashboard is unreachable (curl fails), continue working normally. Decision reporting must never block or delay your work.
+
+---
+
 ## Rules
 
 - This runs ONCE, on-demand. It is not a recurring loop.

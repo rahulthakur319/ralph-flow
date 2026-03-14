@@ -149,6 +149,29 @@ After completing ANY stage, exit: `kill -INT $PPID`
 
 If Tasks Queue in tracker is empty: read `tasks.md`, scan `## TASK-{N}:` headers, populate queue with `{agent: -, status: pending|blocked}` metadata (compute from Dependencies), then start.
 
+## Decision Reporting Protocol
+
+When you make a substantive decision a human reviewer would want to know about, report it to the dashboard:
+
+**When to report:**
+- Scope boundary decisions (what's included/excluded from the task)
+- Approach choices (implementation strategy, library selection, architecture decisions)
+- Trade-off resolutions (performance vs. readability, scope vs. complexity)
+- Interpretation of ambiguous requirements (how you resolved unclear task intent)
+- Self-answered clarification questions (questions you could have asked but resolved yourself)
+- File overlap or conflict decisions (how you handled shared files with other agents)
+
+**How to report:**
+```bash
+curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/decision?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP" -H 'Content-Type: application/json' -d '{"item":"TASK-{N}","agent":"{{AGENT_NAME}}","decision":"{one-line summary}","reasoning":"{why this choice}"}'
+```
+
+**Do NOT report** routine operations: claiming a task, updating heartbeat, stage transitions, waiting for blocked tasks. Only report substantive choices that affect the implementation.
+
+**Best-effort only:** If the dashboard is unreachable (curl fails), continue working normally. Decision reporting must never block or delay your work.
+
+---
+
 ## Rules
 
 - One task at a time per agent. One stage per iteration.
