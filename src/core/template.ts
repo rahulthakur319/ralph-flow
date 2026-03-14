@@ -113,6 +113,7 @@ export interface TemplateLoopDefinition {
   feeds?: string[];
   fed_by?: string[];
   cadence?: number;
+  prompt?: string;
 }
 
 export interface TemplateDefinition {
@@ -301,8 +302,11 @@ export function createCustomTemplate(cwd: string, definition: TemplateDefinition
     const loopDir = join(loopsDir, loopDirName);
     mkdirSync(loopDir, { recursive: true });
 
-    // Blank prompt.md
-    writeFileSync(join(loopDir, 'prompt.md'), `# ${loopDef.name} — Prompt\n\n<!-- Add your prompt here -->\n`, 'utf-8');
+    // Prompt.md — use custom content if provided, otherwise placeholder
+    const promptContent = loopDef.prompt && loopDef.prompt.trim()
+      ? loopDef.prompt
+      : `# ${loopDef.name} — Prompt\n\n<!-- Add your prompt here -->\n`;
+    writeFileSync(join(loopDir, 'prompt.md'), promptContent, 'utf-8');
 
     // Empty tracker.md
     writeFileSync(join(loopDir, 'tracker.md'), `# ${loopDef.name} — Tracker\n\n- stage: ${loopDef.stages[0] || 'init'}\n`, 'utf-8');
