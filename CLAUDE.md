@@ -198,6 +198,9 @@ The Interactive panel (left column, top) renders per-loop attention notification
 ### Documentation Site (docs/)
 VitePress-powered documentation site deployed to GitHub Pages via `.github/workflows/docs.yml`. The site is configured in `docs/.vitepress/config.ts` with nav bar (Guide, Reference, version dropdown), sidebar groups (Getting Started, Using RalphFlow, Reference), local search, dark theme, and edit links. The `base` is set to `/ralph-flow/` matching the GitHub Pages URL. Pages live in `docs/guide/` (quick-start, core-concepts, dashboard) and `docs/reference/` (configuration, templates, api). The GitHub Actions workflow triggers on push to main, builds with `npm run docs:build`, and deploys via `actions/deploy-pages`. Local development: `npm run docs:dev`.
 
+### Documentation Content (docs/)
+Guide pages: `quick-start.md` covers install/init/run/dashboard walkthrough; `core-concepts.md` explains loops, trackers, pipelines, multi-agent, completion detection; `dashboard.md` covers full dashboard features (pipeline view, loop panels, archiving, templates, hooks, real-time updates). Reference pages: `configuration.md` documents every `ralphflow.yaml` field with types, defaults, and complete examples for both built-in templates; `templates.md` covers built-in/custom/clone workflows, directory structure, validation rules, prompt variables; `api.md` lists all REST endpoints with HTTP methods, request/response JSON schemas, status codes, plus WebSocket event schemas.
+
 ## Conventions
 
 - All imports use `.js` extensions (ESM)
