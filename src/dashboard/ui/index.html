@@ -1150,7 +1150,11 @@
   }
 
   /* Template builder */
-  .template-builder { max-width: 800px; }
+  .template-builder { max-width: none; display: grid; grid-template-columns: 280px 1fr; grid-template-rows: auto auto auto; gap: 0 20px; }
+  .builder-col-overview { grid-column: 1; grid-row: 1 / 4; }
+  .builder-col-config { grid-column: 2; grid-row: 1; }
+  .builder-col-prompt { grid-column: 2; grid-row: 2; }
+  .builder-col-actions { grid-column: 1 / -1; grid-row: 3; }
   .builder-section { margin-bottom: 24px; }
   .builder-section-title {
     font-size: 13px;
@@ -1677,6 +1681,7 @@
   let showTemplateBuilder = false;
   let templateBuilderState = null;
   let editingTemplateName = null;
+  let selectedBuilderLoop = 0;
 
   // DOM refs
   const $ = (sel) => document.querySelector(sel);
@@ -3324,6 +3329,7 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
       createBtn.addEventListener('click', () => {
         showTemplateBuilder = true;
         editingTemplateName = null;
+        selectedBuilderLoop = 0;
         templateBuilderState = initTemplateBuilderState();
         renderTemplatesPage();
       });
@@ -3344,6 +3350,10 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
 
   function renderTemplateBuilder() {
     const state = templateBuilderState;
+    // Clamp selectedBuilderLoop to valid range
+    if (selectedBuilderLoop >= state.loops.length) selectedBuilderLoop = Math.max(0, state.loops.length - 1);
+    const si = selectedBuilderLoop;
+    const loop = state.loops[si];
     let html = '';
 
     html += '<div class="templates-header">';
@@ -3352,26 +3362,28 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
 
     html += '<div class="template-builder">';
 
+    // === Section 1: Overview (left column) ===
+    html += '<div class="builder-col-overview">';
+
     // Basic info
     html += '<div class="builder-section">';
     html += '<div class="builder-section-title">Basic Info</div>';
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
     html += `<div class="form-group"><label class="form-label">Template Name</label>
       <input class="form-input" id="tplName" type="text" value="${esc(state.name)}" placeholder="my-pipeline" autocomplete="off"></div>`;
     html += `<div class="form-group"><label class="form-label">Description</label>
       <input class="form-input" id="tplDesc" type="text" value="${esc(state.description)}" placeholder="Pipeline description" autocomplete="off"></div>`;
-    html += '</div></div>';
+    html += '</div>';
 
-    // Pipeline minimap
+    // Pipeline minimap (doubles as loop selector)
     html += '<div class="builder-section">';
     html += '<div class="builder-section-title">Pipeline</div>';
-    html += '<div class="builder-minimap" id="builderMinimap">';
-    state.loops.forEach((loop, i) => {
+    html += '<div class="builder-minimap" id="builderMinimap" style="flex-wrap:wrap">';
+    state.loops.forEach((lp, i) => {
       if (i > 0) {
         html += '<div class="builder-minimap-connector"></div>';
       }
-      const label = loop.name || `Loop ${i + 1}`;
-      html += `<div class="builder-minimap-node" data-minimap-idx="${i}" draggable="true">
+      const label = lp.name || `Loop ${i + 1}`;
+      html += `<div class="builder-minimap-node${i === si ? ' active' : ''}" data-minimap-idx="${i}" draggable="true">
         <span class="minimap-label">${esc(label)}</span>
         <span class="minimap-index">${i + 1}</span>
       </div>`;
@@ -3382,28 +3394,34 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     html += '<button class="builder-minimap-add" id="minimapAddBtn" title="Add loop">+</button>';
     html += '</div></div>';
 
-    // Loops
-    html += '<div class="builder-section">';
-    html += '<div class="builder-section-title">Loops</div>';
-    html += '<div class="loop-cards">';
+    // YAML Preview
+    html += '<div class="builder-section yaml-preview-section">';
+    html += '<div class="builder-section-title">YAML Preview</div>';
+    html += `<pre class="yaml-preview" id="yamlPreview">${esc(generateYamlPreview(state))}</pre>`;
+    html += '</div>';
 
-    state.loops.forEach((loop, i) => {
-      html += `<div class="loop-card" data-loop-index="${i}" draggable="true">`;
-      html += `<div class="loop-card-header">
-        <span class="loop-card-drag-handle" title="Drag to reorder">⠿</span>
-        <span class="loop-card-title">Loop ${i + 1}</span>
-        ${state.loops.length > 1 ? `<button class="loop-card-remove" data-remove-loop="${i}">&times;</button>` : ''}
+    html += '</div>'; // close builder-col-overview
+
+    // === Section 2: Selected loop config (right top) ===
+    html += '<div class="builder-col-config">';
+
+    if (loop) {
+      html += '<div class="builder-section">';
+      html += `<div class="builder-section-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Loop ${si + 1}: ${esc(loop.name || 'Untitled')}</span>
+        ${state.loops.length > 1 ? `<button class="loop-card-remove" data-remove-loop="${si}" title="Remove loop">&times;</button>` : ''}
       </div>`;
 
+      html += `<div class="loop-card" data-loop-index="${si}">`;
       html += '<div class="loop-card-grid">';
 
       // Name
       html += `<div class="form-group"><label class="form-label">Name</label>
-        <input class="form-input loop-input" data-loop-idx="${i}" data-field="name" type="text" value="${esc(loop.name)}" placeholder="Story" autocomplete="off"></div>`;
+        <input class="form-input loop-input" data-loop-idx="${si}" data-field="name" type="text" value="${esc(loop.name)}" placeholder="Story" autocomplete="off"></div>`;
 
       // Model
       html += `<div class="form-group"><label class="form-label">Model</label>
-        <select class="form-select loop-input" data-loop-idx="${i}" data-field="model">
+        <select class="form-select loop-input" data-loop-idx="${si}" data-field="model">
           <option value="claude-sonnet-4-6"${loop.model === 'claude-sonnet-4-6' ? ' selected' : ''}>claude-sonnet-4-6</option>
           <option value="claude-opus-4-6"${loop.model === 'claude-opus-4-6' ? ' selected' : ''}>claude-opus-4-6</option>
           <option value="claude-haiku-4-5-20251001"${loop.model === 'claude-haiku-4-5-20251001' ? ' selected' : ''}>claude-haiku-4-5-20251001</option>
@@ -3411,23 +3429,23 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
 
       // Stages (tag input)
       html += `<div class="form-group loop-card-full"><label class="form-label">Stages</label>
-        <div class="stage-tags" data-loop-idx="${i}">`;
-      loop.stages.forEach((stage, si) => {
-        html += `<span class="stage-tag">${esc(stage)}<button class="stage-tag-remove" data-loop-idx="${i}" data-stage-idx="${si}">&times;</button></span>`;
+        <div class="stage-tags" data-loop-idx="${si}">`;
+      loop.stages.forEach((stage, sti) => {
+        html += `<span class="stage-tag">${esc(stage)}<button class="stage-tag-remove" data-loop-idx="${si}" data-stage-idx="${sti}">&times;</button></span>`;
       });
-      html += `<input type="text" placeholder="Type stage, press Enter" data-stage-input="${i}" autocomplete="off">`;
+      html += `<input type="text" placeholder="Type stage, press Enter" data-stage-input="${si}" autocomplete="off">`;
       html += '</div></div>';
 
       // Completion
       html += `<div class="form-group loop-card-full"><label class="form-label">Completion String</label>
-        <input class="form-input loop-input" data-loop-idx="${i}" data-field="completion" type="text" value="${esc(loop.completion)}" placeholder="LOOP COMPLETE" autocomplete="off"></div>`;
+        <input class="form-input loop-input" data-loop-idx="${si}" data-field="completion" type="text" value="${esc(loop.completion)}" placeholder="LOOP COMPLETE" autocomplete="off"></div>`;
 
       html += '</div>'; // close loop-card-grid
 
       // Multi-agent toggle
       html += `<div style="margin-top:12px">
         <label class="toggle-wrap">
-          <input type="checkbox" class="toggle-input" data-loop-idx="${i}" data-field="multi_agent" ${loop.multi_agent ? 'checked' : ''}>
+          <input type="checkbox" class="toggle-input" data-loop-idx="${si}" data-field="multi_agent" ${loop.multi_agent ? 'checked' : ''}>
           <span class="toggle-label">Multi-agent</span>
         </label>`;
 
@@ -3435,67 +3453,65 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
         html += `<div class="multi-agent-fields">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
             <div class="form-group" style="margin-bottom:0"><label class="form-label">Max Agents</label>
-              <input class="form-input loop-input" data-loop-idx="${i}" data-field="max_agents" type="number" value="${loop.max_agents}" min="2" max="10"></div>
+              <input class="form-input loop-input" data-loop-idx="${si}" data-field="max_agents" type="number" value="${loop.max_agents}" min="2" max="10"></div>
             <div class="form-group" style="margin-bottom:0"><label class="form-label">Strategy</label>
-              <select class="form-select loop-input" data-loop-idx="${i}" data-field="strategy">
+              <select class="form-select loop-input" data-loop-idx="${si}" data-field="strategy">
                 <option value="parallel"${loop.strategy === 'parallel' ? ' selected' : ''}>parallel</option>
                 <option value="sequential"${loop.strategy === 'sequential' ? ' selected' : ''}>sequential</option>
               </select></div>
             <div class="form-group" style="margin-bottom:0"><label class="form-label">Agent Placeholder</label>
-              <input class="form-input loop-input" data-loop-idx="${i}" data-field="agent_placeholder" type="text" value="${esc(loop.agent_placeholder)}"></div>
+              <input class="form-input loop-input" data-loop-idx="${si}" data-field="agent_placeholder" type="text" value="${esc(loop.agent_placeholder)}"></div>
           </div>
         </div>`;
       }
       html += '</div>';
 
       // Optional fields toggle
-      html += `<button class="optional-toggle" data-toggle-optional="${i}">${loop.showOptional ? 'Hide optional fields' : 'Show optional fields'}</button>`;
+      html += `<button class="optional-toggle" data-toggle-optional="${si}">${loop.showOptional ? 'Hide optional fields' : 'Show optional fields'}</button>`;
 
       if (loop.showOptional) {
         html += '<div class="optional-fields">';
         html += '<div class="loop-card-grid">';
         html += `<div class="form-group"><label class="form-label">Data Files <span style="color:var(--text-muted)">(comma-separated)</span></label>
-          <input class="form-input loop-input" data-loop-idx="${i}" data-field="data_files" type="text" value="${esc((loop.data_files || []).join(', '))}" placeholder="stories.md, tasks.md" autocomplete="off"></div>`;
+          <input class="form-input loop-input" data-loop-idx="${si}" data-field="data_files" type="text" value="${esc((loop.data_files || []).join(', '))}" placeholder="stories.md, tasks.md" autocomplete="off"></div>`;
         html += `<div class="form-group"><label class="form-label">Entities <span style="color:var(--text-muted)">(comma-separated)</span></label>
-          <input class="form-input loop-input" data-loop-idx="${i}" data-field="entities" type="text" value="${esc((loop.entities || []).join(', '))}" placeholder="STORY, TASK" autocomplete="off"></div>`;
+          <input class="form-input loop-input" data-loop-idx="${si}" data-field="entities" type="text" value="${esc((loop.entities || []).join(', '))}" placeholder="STORY, TASK" autocomplete="off"></div>`;
         html += '</div></div>';
       }
 
-      // Prompt section toggle
-      html += `<button class="optional-toggle" data-toggle-prompt="${i}">${loop.showPrompt ? 'Hide prompt' : 'Show prompt'}</button>`;
-
-      if (loop.showPrompt) {
-        html += '<div class="prompt-section">';
-        if (loop.useBuilder) {
-          // Block-based prompt builder
-          html += renderPromptBuilderHTML(i, loop);
-        } else {
-          // Raw textarea mode
-          html += `<textarea class="prompt-textarea" data-prompt-idx="${i}" placeholder="Add your prompt here...">${esc(loop.prompt)}</textarea>`;
-          html += `<div class="prompt-builder-toolbar">`;
-          html += `<button class="btn btn-muted" data-use-builder="${i}" style="font-size:11px;padding:4px 10px">Use Builder</button>`;
-          html += `</div>`;
-        }
-        html += '</div>';
-      }
-
       html += '</div>'; // close loop-card
-    });
+      html += '</div>'; // close builder-section
+    }
 
-    html += '</div>'; // close loop-cards
-    html += `<button class="btn btn-muted" id="addLoopBtn" style="margin-top:12px;width:100%">+ Add Loop</button>`;
-    html += '</div>'; // close builder-section
+    html += '</div>'; // close builder-col-config
 
-    // YAML Preview
-    html += '<div class="builder-section yaml-preview-section">';
-    html += '<div class="builder-section-title">YAML Preview</div>';
-    html += `<pre class="yaml-preview" id="yamlPreview">${esc(generateYamlPreview(state))}</pre>`;
-    html += '</div>';
+    // === Section 3: Selected loop prompt (right bottom) ===
+    html += '<div class="builder-col-prompt">';
 
-    // Actions
+    if (loop) {
+      html += '<div class="builder-section">';
+      html += '<div class="builder-section-title">Prompt</div>';
+      html += '<div class="prompt-section" style="margin-top:0;padding-top:0;border-top:none">';
+      if (loop.useBuilder) {
+        html += renderPromptBuilderHTML(si, loop);
+      } else {
+        html += `<textarea class="prompt-textarea" data-prompt-idx="${si}" placeholder="Add your prompt here...">${esc(loop.prompt)}</textarea>`;
+        html += `<div class="prompt-builder-toolbar">`;
+        html += `<button class="btn btn-muted" data-use-builder="${si}" style="font-size:11px;padding:4px 10px">Use Builder</button>`;
+        html += `</div>`;
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+
+    html += '</div>'; // close builder-col-prompt
+
+    // === Actions (spans full width) ===
+    html += '<div class="builder-col-actions">';
     html += '<div class="builder-actions">';
     html += '<button class="btn" id="builderCancelBtn">Cancel</button>';
     html += `<button class="btn btn-primary" id="builderSaveBtn">${editingTemplateName ? 'Update Template' : 'Save Template'}</button>`;
+    html += '</div>';
     html += '</div>';
 
     html += '</div>'; // close template-builder
@@ -3779,6 +3795,7 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     if (addLoopBtn) addLoopBtn.addEventListener('click', () => {
       captureBuilderInputs();
       templateBuilderState.loops.push(createEmptyLoop());
+      selectedBuilderLoop = templateBuilderState.loops.length - 1;
       renderTemplateBuilder();
     });
 
@@ -3899,20 +3916,14 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
       });
     });
 
-    // Minimap: click node → scroll to loop card + highlight
+    // Minimap: click node → select that loop (capture inputs first, then re-render)
     content.querySelectorAll('.builder-minimap-node').forEach(node => {
       node.addEventListener('click', () => {
         const idx = parseInt(node.dataset.minimapIdx);
-        const card = content.querySelector(`.loop-card[data-loop-index="${idx}"]`);
-        if (!card) return;
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Highlight the card briefly
-        content.querySelectorAll('.loop-card.highlighted').forEach(c => c.classList.remove('highlighted'));
-        card.classList.add('highlighted');
-        setTimeout(() => card.classList.remove('highlighted'), 1500);
-        // Update active minimap node
-        content.querySelectorAll('.builder-minimap-node.active').forEach(n => n.classList.remove('active'));
-        node.classList.add('active');
+        if (idx === selectedBuilderLoop) return;
+        captureBuilderInputs();
+        selectedBuilderLoop = idx;
+        renderTemplateBuilder();
       });
     });
 
@@ -3922,18 +3933,10 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
       minimapAddBtn.addEventListener('click', () => {
         captureBuilderInputs();
         templateBuilderState.loops.push(createEmptyLoop());
+        selectedBuilderLoop = templateBuilderState.loops.length - 1;
         renderTemplateBuilder();
-        // Scroll to the new card after render
-        setTimeout(() => {
-          const cards = content.querySelectorAll('.loop-card');
-          const last = cards[cards.length - 1];
-          if (last) last.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 50);
       });
     }
-
-    // Minimap: bidirectional sync — scroll highlights minimap node
-    setupMinimapScrollSync();
 
     // Drag-and-drop reordering for minimap nodes and loop cards
     setupBuilderDragAndDrop();
@@ -4330,6 +4333,7 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
 
       editingTemplateName = templateName;
       showTemplateBuilder = true;
+      selectedBuilderLoop = 0;
       templateBuilderState = {
         name: config.name || templateName,
         description: config.description || '',
