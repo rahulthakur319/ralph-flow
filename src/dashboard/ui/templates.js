@@ -21,6 +21,11 @@ export async function fetchTemplates() {
 }
 
 export async function renderTemplatesPage() {
+  if (state.showTemplateWizard) {
+    renderTemplateWizard();
+    return;
+  }
+
   if (state.showTemplateBuilder) {
     renderTemplateBuilder();
     return;
@@ -65,10 +70,9 @@ export async function renderTemplatesPage() {
   const createBtn = document.getElementById('createTemplateBtn');
   if (createBtn) {
     createBtn.addEventListener('click', () => {
-      state.showTemplateBuilder = true;
-      state.editingTemplateName = null;
-      state.selectedBuilderLoop = 0;
-      state.templateBuilderState = initTemplateBuilderState();
+      state.showTemplateWizard = true;
+      state.wizardStep = 0;
+      state.wizardData = { description: '', loops: [{ name: '', stages: '' }], multiAgent: false, multiAgentLoop: -1, maxAgents: 3, claudeArgs: '', skipPermissions: true };
       renderTemplatesPage();
     });
   }
@@ -102,6 +106,494 @@ export async function renderTemplatesPage() {
       openCloneTemplateModal(btn.dataset.cloneTemplate);
     });
   });
+}
+
+// -----------------------------------------------------------------------
+// Conversational template wizard
+// -----------------------------------------------------------------------
+
+function captureWizardInputs() {
+  const wd = state.wizardData;
+  if (!wd) return;
+  const step = state.wizardStep;
+
+  if (step === 0) {
+    const descEl = document.getElementById('wizardDesc');
+    if (descEl) wd.description = descEl.value;
+  } else if (step === 1) {
+    // Capture all loop rows
+    document.querySelectorAll('.wizard-loop-row').forEach((row, i) => {
+      if (!wd.loops[i]) wd.loops[i] = { name: '', stages: '' };
+      const nameEl = row.querySelector('.wizard-loop-name');
+      const stagesEl = row.querySelector('.wizard-loop-stages');
+      if (nameEl) wd.loops[i].name = nameEl.value;
+      if (stagesEl) wd.loops[i].stages = stagesEl.value;
+    });
+  } else if (step === 2) {
+    const maToggle = document.getElementById('wizardMultiAgent');
+    if (maToggle) wd.multiAgent = maToggle.checked;
+    const maLoop = document.getElementById('wizardMultiAgentLoop');
+    if (maLoop) wd.multiAgentLoop = parseInt(maLoop.value);
+    const maxAgents = document.getElementById('wizardMaxAgents');
+    if (maxAgents) wd.maxAgents = parseInt(maxAgents.value) || 3;
+    const argsEl = document.getElementById('wizardClaudeArgs');
+    if (argsEl) wd.claudeArgs = argsEl.value;
+    const skipEl = document.getElementById('wizardSkipPerms');
+    if (skipEl) wd.skipPermissions = skipEl.checked;
+  }
+}
+
+function inferTemplateNameFromDescription(desc) {
+  if (!desc) return 'my-pipeline';
+  return desc
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 3)
+    .join('-') || 'my-pipeline';
+}
+
+function buildWizardDefinition() {
+  const wd = state.wizardData;
+  const name = inferTemplateNameFromDescription(wd.description);
+  const loops = wd.loops.filter(l => l.name.trim()).map((l, i, arr) => {
+    const stages = l.stages.split(',').map(s => s.trim()).filter(Boolean);
+    const def = {
+      name: l.name.trim(),
+      stages: stages.length > 0 ? stages : ['analyze', 'execute', 'verify'],
+      completion: l.name.trim().toUpperCase().replace(/\s+/g, '_') + '_COMPLETE',
+    };
+    // Auto-wire I/O: each loop's output = its name, next loop's input = previous output
+    const outFile = l.name.trim().toLowerCase().replace(/\s+/g, '-') + '.md';
+    if (i < arr.length - 1) {
+      def.feeds = [outFile];
+    }
+    if (i > 0) {
+      const prevOut = arr[i - 1].name.trim().toLowerCase().replace(/\s+/g, '-') + '.md';
+      def.fed_by = [prevOut];
+    }
+    // Multi-agent
+    if (wd.multiAgent && wd.multiAgentLoop === i) {
+      def.multi_agent = { max_agents: wd.maxAgents, strategy: 'parallel' };
+    }
+    // Claude args
+    const argsList = (wd.claudeArgs || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (argsList.length > 0) def.claude_args = argsList;
+    if (wd.skipPermissions === false) def.skip_permissions = false;
+    return def;
+  });
+
+  if (loops.length === 0) {
+    loops.push({ name: 'default', stages: ['analyze', 'execute', 'verify'], completion: 'ALL DONE' });
+  }
+
+  return { name, description: wd.description.trim(), loops };
+}
+
+function renderWizardPipelinePreview() {
+  const wd = state.wizardData;
+  const loops = wd.loops.filter(l => l.name.trim());
+  if (loops.length === 0) return '<div class="wizard-preview-empty">Add loops to see a preview</div>';
+
+  let html = '<div class="wizard-pipeline-preview">';
+  loops.forEach((l, i) => {
+    if (i > 0) {
+      const prevOut = loops[i - 1].name.trim().toLowerCase().replace(/\s+/g, '-') + '.md';
+      html += `<div class="wizard-preview-connector"><div class="builder-minimap-connector-line"></div><span class="builder-minimap-connector-file">${esc(prevOut)}</span></div>`;
+    }
+    const stages = l.stages.split(',').map(s => s.trim()).filter(Boolean);
+    const stageDisplay = stages.length > 0 ? stages.join(' &rarr; ') : '<em>default stages</em>';
+    const isMultiAgent = wd.multiAgent && wd.multiAgentLoop === i;
+    html += `<div class="wizard-preview-node${isMultiAgent ? ' multi-agent' : ''}">`;
+    html += `<span class="minimap-label">${esc(l.name.trim())}</span>`;
+    html += `<span class="wizard-preview-stages">${stageDisplay}</span>`;
+    if (isMultiAgent) html += `<span class="wizard-preview-badge">multi-agent</span>`;
+    html += '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderTemplateWizard() {
+  const wd = state.wizardData;
+  const step = state.wizardStep;
+  const totalSteps = 4; // 0-3
+
+  let html = '';
+  html += '<div class="templates-header">';
+  html += `<div style="display:flex;align-items:center;gap:12px"><button class="btn btn-muted" id="wizardBackBtn" style="padding:4px 10px">&larr; Back</button><h2>Create Template</h2></div>`;
+  html += '</div>';
+
+  // Progress bar
+  html += '<div class="wizard-progress">';
+  for (let i = 0; i < totalSteps; i++) {
+    html += `<div class="wizard-progress-step${i <= step ? ' active' : ''}${i < step ? ' done' : ''}">
+      <span class="wizard-step-dot">${i < step ? '&#10003;' : i + 1}</span>
+      <span class="wizard-step-label">${['Describe', 'Define Steps', 'Options', 'Review'][i]}</span>
+    </div>`;
+    if (i < totalSteps - 1) html += '<div class="wizard-progress-line' + (i < step ? ' done' : '') + '"></div>';
+  }
+  html += '</div>';
+
+  html += '<div class="wizard-content">';
+
+  if (step === 0) {
+    // Step 1: What kind of flow?
+    html += '<div class="wizard-step-card">';
+    html += '<h3 class="wizard-question">What are you building?</h3>';
+    html += '<p class="wizard-hint">Describe your workflow in plain text. For example: "Break down user stories into tasks, implement them in code, then verify and document the changes."</p>';
+    html += `<textarea class="wizard-textarea" id="wizardDesc" placeholder="Describe your pipeline..." autofocus>${esc(wd.description)}</textarea>`;
+    html += '</div>';
+  } else if (step === 1) {
+    // Step 2: Define pipeline steps
+    html += '<div class="wizard-step-card">';
+    html += '<h3 class="wizard-question">Define your pipeline steps</h3>';
+    html += '<p class="wizard-hint">Each step becomes a loop. For each, give it a name and optionally list its stages (comma-separated). Stages define what the AI agent does in each iteration cycle.</p>';
+    html += '<div class="wizard-loops-list" id="wizardLoopsList">';
+    wd.loops.forEach((l, i) => {
+      html += `<div class="wizard-loop-row" data-loop-idx="${i}">
+        <span class="wizard-loop-number">${i + 1}</span>
+        <div class="wizard-loop-fields">
+          <input class="form-input wizard-loop-name" type="text" value="${esc(l.name)}" placeholder="e.g. Story, Tasks, Verify" autocomplete="off">
+          <input class="form-input wizard-loop-stages" type="text" value="${esc(l.stages)}" placeholder="Stages (e.g. analyze, execute, verify)" autocomplete="off">
+        </div>
+        ${wd.loops.length > 1 ? `<button class="wizard-loop-remove" data-remove-wizard-loop="${i}" title="Remove">&times;</button>` : ''}
+      </div>`;
+    });
+    html += '</div>';
+    html += '<button class="btn btn-muted" id="wizardAddLoop" style="margin-top:8px">+ Add Step</button>';
+    html += '</div>';
+
+    // Live pipeline preview
+    html += '<div class="wizard-step-card">';
+    html += '<div class="builder-section-title">Pipeline Preview</div>';
+    html += renderWizardPipelinePreview();
+    html += '</div>';
+  } else if (step === 2) {
+    // Step 3: Special requirements
+    html += '<div class="wizard-step-card">';
+    html += '<h3 class="wizard-question">Any special requirements?</h3>';
+    html += '<p class="wizard-hint">Configure multi-agent coordination, CLI flags, and permissions. All optional &mdash; defaults work for most cases.</p>';
+
+    // Multi-agent toggle
+    html += '<div class="wizard-option">';
+    html += '<div class="wizard-option-header">';
+    html += '<label class="wizard-option-label">Multi-agent coordination</label>';
+    html += `<div class="toggle-wrap"><input class="toggle-input" id="wizardMultiAgent" type="checkbox" ${wd.multiAgent ? 'checked' : ''}><span class="toggle-label">${wd.multiAgent ? 'On' : 'Off'}</span></div>`;
+    html += '</div>';
+    html += '<div class="wizard-option-desc">Run multiple AI agents in parallel on a single loop, coordinating via tracker locks.</div>';
+
+    if (wd.multiAgent) {
+      html += '<div class="wizard-sub-options">';
+      html += '<div class="form-group"><label class="form-label">Which loop?</label>';
+      html += '<select class="form-select" id="wizardMultiAgentLoop">';
+      wd.loops.forEach((l, i) => {
+        const label = l.name.trim() || `Loop ${i + 1}`;
+        html += `<option value="${i}"${wd.multiAgentLoop === i ? ' selected' : ''}>${esc(label)}</option>`;
+      });
+      html += '</select></div>';
+      html += `<div class="form-group"><label class="form-label">Max agents</label><input class="form-input" id="wizardMaxAgents" type="number" min="2" max="10" value="${wd.maxAgents}"></div>`;
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Claude CLI Args
+    html += '<div class="wizard-option">';
+    html += `<div class="form-group"><label class="form-label">Claude CLI args <span class="form-hint">Extra flags for all loops</span></label>
+      <input class="form-input" id="wizardClaudeArgs" type="text" value="${esc(wd.claudeArgs)}" placeholder="e.g. --chrome, --verbose" autocomplete="off"></div>`;
+    html += '</div>';
+
+    // Skip permissions
+    html += '<div class="wizard-option">';
+    html += '<div class="wizard-option-header">';
+    html += '<label class="wizard-option-label">Skip permissions</label>';
+    html += `<div class="toggle-wrap"><input class="toggle-input" id="wizardSkipPerms" type="checkbox" ${wd.skipPermissions !== false ? 'checked' : ''}><span class="toggle-label">${wd.skipPermissions !== false ? 'On' : 'Off'}</span></div>`;
+    html += '</div>';
+    html += '<div class="wizard-option-desc">Add <code>--dangerously-skip-permissions</code> to Claude sessions.</div>';
+    html += '</div>';
+    html += '</div>';
+  } else if (step === 3) {
+    // Step 4: Review & Generate
+    const def = buildWizardDefinition();
+    const jsonStr = JSON.stringify(def, null, 2);
+    const cliCmd = `npx ralphflow create-template --config '${JSON.stringify(def)}'`;
+
+    html += '<div class="wizard-step-card">';
+    html += '<h3 class="wizard-question">Review &amp; Create</h3>';
+    html += '<p class="wizard-hint">Your template is ready. Review the pipeline below, then create it directly or copy the CLI command.</p>';
+    html += '</div>';
+
+    // Pipeline preview
+    html += '<div class="wizard-step-card">';
+    html += '<div class="builder-section-title">Pipeline</div>';
+    html += renderWizardPipelinePreview();
+    html += '</div>';
+
+    // CLI command
+    html += '<div class="wizard-step-card">';
+    html += '<div class="builder-section-title">CLI Command</div>';
+    html += `<pre class="wizard-cli-command" id="wizardCliCommand">${esc(cliCmd)}</pre>`;
+    html += '<div class="wizard-actions-row">';
+    html += '<button class="btn" id="wizardCopyBtn">Copy to Clipboard</button>';
+    html += '<button class="btn btn-primary" id="wizardCreateBtn">Create Directly</button>';
+    html += '</div>';
+    html += '</div>';
+
+    // JSON preview (collapsible)
+    html += '<div class="wizard-step-card">';
+    html += '<button class="yaml-toggle" id="wizardJsonToggle"><span class="yaml-toggle-icon">&rsaquo;</span> Template Definition (JSON)</button>';
+    html += `<pre class="yaml-preview" id="wizardJsonPreview" style="display:none">${esc(jsonStr)}</pre>`;
+    html += '</div>';
+
+    // Advanced: open in full builder
+    html += '<div class="wizard-step-card" style="border:none;background:none;padding:8px 0">';
+    html += '<button class="btn btn-muted" id="wizardOpenBuilder" style="font-size:12px">Open in Full Builder for Fine-Tuning</button>';
+    html += '</div>';
+  }
+
+  html += '</div>'; // close wizard-content
+
+  // Navigation buttons
+  html += '<div class="wizard-nav">';
+  if (step > 0) {
+    html += '<button class="btn" id="wizardPrevBtn">&larr; Previous</button>';
+  } else {
+    html += '<span></span>';
+  }
+  if (step < totalSteps - 1) {
+    const nextDisabled = step === 0 && !wd.description.trim();
+    html += `<button class="btn btn-primary" id="wizardNextBtn"${nextDisabled ? ' disabled' : ''}>Next &rarr;</button>`;
+  }
+  html += '</div>';
+
+  dom.content.innerHTML = html;
+  bindWizardEvents();
+}
+
+function bindWizardEvents() {
+  const step = state.wizardStep;
+
+  // Back to templates list
+  const backBtn = document.getElementById('wizardBackBtn');
+  if (backBtn) backBtn.addEventListener('click', () => {
+    state.showTemplateWizard = false;
+    state.wizardData = null;
+    state.wizardStep = 0;
+    renderTemplatesPage();
+  });
+
+  // Previous step
+  const prevBtn = document.getElementById('wizardPrevBtn');
+  if (prevBtn) prevBtn.addEventListener('click', () => {
+    captureWizardInputs();
+    state.wizardStep--;
+    renderTemplatesPage();
+  });
+
+  // Next step
+  const nextBtn = document.getElementById('wizardNextBtn');
+  if (nextBtn) nextBtn.addEventListener('click', () => {
+    captureWizardInputs();
+    // Validate current step
+    const wd = state.wizardData;
+    if (step === 0 && !wd.description.trim()) return;
+    if (step === 1) {
+      const validLoops = wd.loops.filter(l => l.name.trim());
+      if (validLoops.length === 0) {
+        alert('Add at least one pipeline step with a name');
+        return;
+      }
+    }
+    state.wizardStep++;
+    renderTemplatesPage();
+  });
+
+  // Step 0: description textarea enables/disables Next
+  if (step === 0) {
+    const descEl = document.getElementById('wizardDesc');
+    if (descEl) {
+      descEl.addEventListener('input', () => {
+        state.wizardData.description = descEl.value;
+        const nextBtnEl = document.getElementById('wizardNextBtn');
+        if (nextBtnEl) nextBtnEl.disabled = !descEl.value.trim();
+      });
+      // Auto-focus
+      setTimeout(() => descEl.focus(), 50);
+    }
+  }
+
+  // Step 1: loop management
+  if (step === 1) {
+    // Live-update pipeline preview on input change
+    const updatePreview = () => {
+      captureWizardInputs();
+      const previewContainer = dom.content.querySelector('.wizard-pipeline-preview, .wizard-preview-empty');
+      if (previewContainer) {
+        const wrapper = previewContainer.parentElement;
+        const titleEl = wrapper.querySelector('.builder-section-title');
+        const newHtml = renderWizardPipelinePreview();
+        // Replace content after the title
+        const temp = document.createElement('div');
+        temp.innerHTML = newHtml;
+        if (previewContainer) previewContainer.replaceWith(temp.firstElementChild || temp);
+      }
+    };
+
+    document.querySelectorAll('.wizard-loop-name, .wizard-loop-stages').forEach(input => {
+      input.addEventListener('input', updatePreview);
+    });
+
+    // Add loop button
+    const addLoopBtn = document.getElementById('wizardAddLoop');
+    if (addLoopBtn) addLoopBtn.addEventListener('click', () => {
+      captureWizardInputs();
+      state.wizardData.loops.push({ name: '', stages: '' });
+      renderTemplatesPage();
+    });
+
+    // Remove loop buttons
+    document.querySelectorAll('[data-remove-wizard-loop]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        captureWizardInputs();
+        const idx = parseInt(btn.dataset.removeWizardLoop);
+        state.wizardData.loops.splice(idx, 1);
+        if (state.wizardData.multiAgentLoop >= state.wizardData.loops.length) {
+          state.wizardData.multiAgentLoop = Math.max(0, state.wizardData.loops.length - 1);
+        }
+        renderTemplatesPage();
+      });
+    });
+  }
+
+  // Step 2: toggle events
+  if (step === 2) {
+    const maToggle = document.getElementById('wizardMultiAgent');
+    if (maToggle) {
+      maToggle.addEventListener('change', () => {
+        state.wizardData.multiAgent = maToggle.checked;
+        const label = maToggle.parentElement.querySelector('.toggle-label');
+        if (label) label.textContent = maToggle.checked ? 'On' : 'Off';
+        // If multi-agent just turned on, default to the loop with most work (usually index 1 or 0)
+        if (maToggle.checked && state.wizardData.multiAgentLoop < 0) {
+          state.wizardData.multiAgentLoop = Math.min(1, state.wizardData.loops.length - 1);
+        }
+        renderTemplatesPage();
+      });
+    }
+
+    const skipToggle = document.getElementById('wizardSkipPerms');
+    if (skipToggle) {
+      skipToggle.addEventListener('change', () => {
+        state.wizardData.skipPermissions = skipToggle.checked;
+        const label = skipToggle.parentElement.querySelector('.toggle-label');
+        if (label) label.textContent = skipToggle.checked ? 'On' : 'Off';
+      });
+    }
+  }
+
+  // Step 3: Review actions
+  if (step === 3) {
+    const copyBtn = document.getElementById('wizardCopyBtn');
+    if (copyBtn) copyBtn.addEventListener('click', () => {
+      const cmdEl = document.getElementById('wizardCliCommand');
+      if (cmdEl) {
+        navigator.clipboard.writeText(cmdEl.textContent).then(() => {
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => { copyBtn.textContent = 'Copy to Clipboard'; }, 2000);
+        }).catch(() => {
+          // Fallback: select text
+          const range = document.createRange();
+          range.selectNodeContents(cmdEl);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        });
+      }
+    });
+
+    const createBtn = document.getElementById('wizardCreateBtn');
+    if (createBtn) createBtn.addEventListener('click', async () => {
+      createBtn.disabled = true;
+      createBtn.textContent = 'Creating...';
+      try {
+        const def = buildWizardDefinition();
+        const res = await fetch('/api/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(def)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'Failed to create template');
+          createBtn.disabled = false;
+          createBtn.textContent = 'Create Directly';
+          return;
+        }
+        state.showTemplateWizard = false;
+        state.wizardData = null;
+        state.wizardStep = 0;
+        state.templatesList = [];
+        renderTemplatesPage();
+      } catch {
+        alert('Network error — could not reach server');
+        createBtn.disabled = false;
+        createBtn.textContent = 'Create Directly';
+      }
+    });
+
+    // JSON preview toggle
+    const jsonToggle = document.getElementById('wizardJsonToggle');
+    if (jsonToggle) jsonToggle.addEventListener('click', () => {
+      const preview = document.getElementById('wizardJsonPreview');
+      const icon = jsonToggle.querySelector('.yaml-toggle-icon');
+      if (preview) {
+        const visible = preview.style.display !== 'none';
+        preview.style.display = visible ? 'none' : 'block';
+        if (icon) icon.textContent = visible ? '\u203A' : '\u2304';
+      }
+    });
+
+    // Open in full builder
+    const openBuilderBtn = document.getElementById('wizardOpenBuilder');
+    if (openBuilderBtn) openBuilderBtn.addEventListener('click', () => {
+      captureWizardInputs();
+      const def = buildWizardDefinition();
+      // Convert wizard definition to builder state
+      const loops = def.loops.map(l => {
+        const loopState = createEmptyLoop();
+        loopState.name = l.name;
+        loopState.stages = l.stages;
+        loopState.completion = l.completion;
+        loopState.inputFiles = (l.fed_by || []).join(', ');
+        loopState.outputFiles = (l.feeds || []).join(', ');
+        loopState.claudeArgs = (l.claude_args || []).join(', ');
+        if (l.skip_permissions === false) loopState.skipPermissions = false;
+        if (l.multi_agent) {
+          loopState.multi_agent = true;
+          loopState.max_agents = l.multi_agent.max_agents || 3;
+          loopState.strategy = l.multi_agent.strategy || 'parallel';
+        }
+        loopState._outputAutoFilled = false;
+        loopState._inputAutoFilled = false;
+        syncStageConfigs(loopState);
+        return loopState;
+      });
+
+      state.showTemplateWizard = false;
+      state.wizardData = null;
+      state.wizardStep = 0;
+      state.showTemplateBuilder = true;
+      state.editingTemplateName = null;
+      state.selectedBuilderLoop = 0;
+      state.templateBuilderState = {
+        name: def.name,
+        description: def.description,
+        loops: loops.length > 0 ? loops : [createEmptyLoop()]
+      };
+      renderTemplatesPage();
+    });
+  }
 }
 
 // -----------------------------------------------------------------------
@@ -514,7 +1006,7 @@ export function renderTemplateBuilder() {
       html += renderPromptConfigForm(si, loop, tbs.loops);
     } else {
       html += `<textarea class="prompt-textarea" data-prompt-idx="${si}" placeholder="Add your prompt here...">${esc(loop.prompt)}</textarea>`;
-      html += `<div class="prompt-builder-toolbar">`;
+      html += `<div class="prompt-toolbar">`;
       html += `<button class="btn btn-muted" data-show-prompt-form="${si}" style="font-size:11px;padding:4px 10px">Regenerate</button>`;
       html += `</div>`;
     }
