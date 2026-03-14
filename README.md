@@ -15,23 +15,26 @@ Define pipelines as loops, coordinate parallel agents via file-based trackers, a
 npx ralphflow
 ```
 
-The interactive menu lets you initialize apps, run individual loops, run all loops in sequence, launch the web dashboard, or check status — no flags needed.
+This starts the web dashboard at `http://localhost:4242` and opens it in your browser. From the dashboard you can create apps, run loops, edit prompts, monitor agents, and browse archives — all in one place.
 
-### Advanced Usage
+### CLI Commands
 
 ```bash
-# Non-interactive commands (same as before)
+# Initialize a new flow
 npx ralphflow init --template code-implementation --name my-app
+
+# Run loops
 npx ralphflow run story
 npx ralphflow run tasks
 npx ralphflow run tasks --multi-agent   # Multi-agent — one terminal per agent
 npx ralphflow run delivery
-npx ralphflow status
 
-# Web dashboard
-npx ralphflow dashboard                 # Start dashboard at http://localhost:4242
-npx ralphflow run tasks --ui            # Run with live dashboard alongside
-npx ralphflow e2e --ui                  # E2E with live dashboard
+# Run with live dashboard alongside
+npx ralphflow run tasks --ui
+npx ralphflow e2e --ui
+
+# Check status
+npx ralphflow status
 ```
 
 ## How It Works
@@ -59,9 +62,33 @@ Story Loop          Tasks Loop              Delivery Loop
                    agent-1 agent-2 agent-3
 ```
 
+## Web Dashboard
+
+The dashboard (`http://localhost:4242`) is the primary interface for managing workflows.
+
+**Features:**
+- **Live pipeline view** — color-coded loop status (complete/running/pending)
+- **Per-loop detail** — stage, active item, progress bar, agent table
+- **Prompt editor** — edit prompt files with Cmd+S save and dirty indicator
+- **Tracker viewer** — auto-updates as agents write via WebSocket
+- **Model selector** — per-loop model configuration (claude-sonnet-4-6, claude-opus-4-6, etc.)
+- **Attention notifications** — real-time alerts when Claude needs input, with desktop notifications and audio chime
+- **App archiving** — snapshot and reset flows to start fresh
+- **Archive browser** — browse past snapshots with timeline view and file viewer
+- **Template creator** — build custom templates with a visual config builder and live YAML preview
+- **Create app** — initialize new flows from built-in or custom templates
+
+```bash
+npx ralphflow dashboard              # Default port 4242
+npx ralphflow dashboard -p 3000      # Custom port
+npx ralphflow ui                     # Alias
+```
+
 ## Commands
 
-All commands are run via `npx ralphflow` — no global install needed.
+### `npx ralphflow` (no args)
+
+Starts the dashboard and opens it in your browser. This is the recommended way to use RalphFlow.
 
 ### `npx ralphflow init`
 
@@ -73,55 +100,30 @@ npx ralphflow init --template code-implementation --name api # Non-interactive
 npx ralphflow init --template research --name kashi          # Research pipeline
 ```
 
-Requires `CLAUDE.md` to exist in your project root. If it doesn't, you'll be prompted to create one first.
-
 **Options:**
-- `-t, --template <name>` — Template to use (`code-implementation`, `research`)
+- `-t, --template <name>` — Template to use (`code-implementation`, `research`, or any custom template)
 - `-n, --name <name>` — Custom name for the flow
 
 ### `npx ralphflow run <loop>`
 
-Runs a loop. Handles the iteration cycle — spawning Claude, detecting completion signals, and restarting on `kill -INT $PPID`.
+Runs a loop. Handles the iteration cycle — spawning Claude, detecting completion signals, and restarting.
 
 ```bash
 npx ralphflow run story                    # Run story loop (interactive Claude session)
 npx ralphflow run tasks                    # Run tasks loop (single agent)
-npx ralphflow run tasks --multi-agent      # Run as a multi-agent instance (auto-assigns agent ID)
-npx ralphflow run delivery                 # Run delivery loop
-npx ralphflow run story --flow my-app      # Specify which flow (when multiple exist)
-npx ralphflow run tasks --max-iterations 5 # Limit iterations
+npx ralphflow run tasks --multi-agent      # Run as a multi-agent instance
+npx ralphflow run tasks --ui              # Run with live dashboard alongside
+npx ralphflow run tasks -m claude-opus-4-6  # Use a specific model
 ```
 
-Each `run` command opens a full interactive Claude Code session. Claude owns the terminal — you see everything it does in real time.
-
-**Multi-agent mode:** Instead of spawning N agents from one process, each terminal is one agent. Open multiple terminals, run `--multi-agent` in each, and they auto-assign sequential agent IDs (`agent-1`, `agent-2`, ...) via PID-based lock files. Stale agents are automatically cleaned up.
+**Multi-agent mode:** Each terminal is one agent. Open multiple terminals, run `--multi-agent` in each, and they auto-assign sequential agent IDs (`agent-1`, `agent-2`, ...) via PID-based lock files.
 
 **Options:**
-- `--multi-agent` — Run as a multi-agent instance (auto-assigns agent ID)
+- `--multi-agent` — Run as a multi-agent instance
 - `--ui` — Start the web dashboard alongside execution
-- `-m, --model <model>` — Claude model to use
+- `-m, --model <model>` — Claude model to use (overrides per-loop config)
 - `-n, --max-iterations <n>` — Maximum iterations (default: 30)
-- `-f, --flow <name>` — Which flow to run (auto-detected if only one exists)
-
-### `npx ralphflow dashboard`
-
-Starts a real-time web dashboard at `http://localhost:4242`. Shows all apps, loop pipelines, tracker status, and lets you edit prompt files — all updated live via WebSocket as agents work.
-
-```bash
-npx ralphflow dashboard              # Default port 4242
-npx ralphflow dashboard -p 3000      # Custom port
-npx ralphflow ui                     # Alias
-```
-
-**Features:**
-- Live pipeline view with color-coded status (complete/running/pending)
-- Per-loop detail: stage, active item, progress bar, agent table
-- Prompt editor with Cmd+S save and dirty indicator
-- Live tracker viewer (auto-updates as agents write)
-- WebSocket auto-reconnect with exponential backoff
-
-**Options:**
-- `-p, --port <port>` — Port number (default: 4242)
+- `-f, --flow <name>` — Which flow to run
 
 ### `npx ralphflow e2e`
 
@@ -130,23 +132,17 @@ Runs all loops end-to-end with SQLite orchestration. Skips loops already complet
 ```bash
 npx ralphflow e2e                   # Run all loops
 npx ralphflow e2e --ui              # With live dashboard
-npx ralphflow e2e --flow my-app     # Specific flow
 ```
 
 **Options:**
-- `--ui` — Start the web dashboard alongside execution
+- `--ui` — Start the web dashboard alongside
 - `-m, --model <model>` — Claude model to use
 - `-n, --max-iterations <n>` — Maximum iterations per loop (default: 30)
-- `-f, --flow <name>` — Which flow to run (auto-detected if only one exists)
+- `-f, --flow <name>` — Which flow to run
 
 ### `npx ralphflow status`
 
-Shows the current state of all loops across all flows.
-
-```bash
-npx ralphflow status                # All flows
-npx ralphflow status --flow my-app  # Specific flow
-```
+Shows the current state of all loops.
 
 ```
   RalphFlow — my-app
@@ -157,32 +153,40 @@ npx ralphflow status --flow my-app  # Specific flow
   Delivery Loop  idle     none    0/0
 ```
 
-**Options:**
-- `-f, --flow <name>` — Show status for a specific flow
+## Per-Loop Model Configuration
+
+Each loop in `ralphflow.yaml` supports an optional `model` field:
+
+```yaml
+loops:
+  story-loop:
+    model: claude-sonnet-4-6
+  tasks-loop:
+    model: claude-opus-4-6
+```
+
+**Resolution order:** CLI `--model` flag → per-loop `model` from config → Claude default. The dashboard includes a model selector dropdown to configure this per loop.
+
+## Templates
+
+### Built-in
+
+- **`code-implementation`** — Story → Tasks → Delivery pipeline for code projects
+- **`research`** — Discovery → Research → Story → Document pipeline for research projects
+
+### Custom Templates
+
+Create custom templates via the dashboard's Template Creator or the API. Custom templates are stored in `.ralph-flow/.templates/` and appear alongside built-in templates when creating new apps.
 
 ## Multiple Flows
 
-You can run multiple flows in the same project — useful for separate workstreams:
+Run multiple flows in the same project for separate workstreams:
 
 ```bash
 npx ralphflow init --template code-implementation --name frontend
 npx ralphflow init --template code-implementation --name backend
 npx ralphflow init --template research --name market-research
-
-npx ralphflow status  # Shows all three
 ```
-
-When multiple flows exist, use `--flow <name>` with `run` and `status`.
-
-## Templates
-
-### `code-implementation`
-
-Story → Tasks → Delivery pipeline for code projects. Battle-tested across 28 stories and 84 tasks.
-
-### `research`
-
-Discovery → Research → Story → Document pipeline for research projects. Four loops: discovery (decompose topics), research (investigate with multi-agent), story (synthesize narratives), and document (compile final output).
 
 ## Project Structure
 
@@ -197,19 +201,14 @@ your-project/
         ├── 00-story-loop/
         │   ├── prompt.md                  # Agent instructions
         │   ├── tracker.md                 # State tracking
-        │   ├── stories.md                 # Story definitions
-        │   └── loop.md                    # Manual run instructions
+        │   └── stories.md                 # Story definitions
         ├── 01-tasks-loop/
         │   ├── prompt.md
         │   ├── tracker.md
-        │   ├── tasks.md
-        │   ├── loop.md
-        │   ├── phases/                    # Phase documentation
-        │   └── testing/                   # Test documentation
+        │   └── tasks.md
         └── 02-delivery-loop/
             ├── prompt.md
-            ├── tracker.md
-            └── loop.md
+            └── tracker.md
 ```
 
 ## CLAUDE.md
@@ -217,11 +216,10 @@ your-project/
 `CLAUDE.md` is a first-class citizen of the workflow:
 
 - **Story loop** reads it for project context
-- **Tasks loop** reads it for architecture, stack, conventions, commands, and URLs
-- **Tasks loop updates it** after each task (keeping changes under 150 words net)
+- **Tasks loop** reads it for architecture, stack, conventions, and commands — and updates it after each task
 - **Delivery loop** reads it for project context and patterns
 
-RalphFlow requires `CLAUDE.md` to exist before initializing a flow. Create one with your project description, tech stack, dev commands, and conventions — or let Claude generate it for you.
+RalphFlow requires `CLAUDE.md` to exist before initializing a flow.
 
 ## Install
 
@@ -229,14 +227,6 @@ No install required — use `npx ralphflow` directly. Or install globally:
 
 ```bash
 npm install -g ralphflow
-```
-
-Then use without the `npx` prefix:
-
-```bash
-ralphflow init --template code-implementation --name my-app
-ralphflow run story
-ralphflow status
 ```
 
 ## Requirements

@@ -15,8 +15,10 @@ Read `.ralph-flow/{{APP_NAME}}/00-story-loop/tracker.md` FIRST to determine wher
 ## State Machine (3 stages per story)
 
 **FIRST — Check completion.** Read the tracker. If the Stories Queue has entries
-AND every entry is `[x]`, write `<promise>ALL STORIES PROCESSED</promise>` to
-the bottom of the tracker and `kill -INT $PPID`. Do NOT collect new stories.
+AND every entry is `[x]` (no pending stories), do NOT write the completion promise yet.
+Instead, go to **"No Stories? Collect Them"** to ask the user for new stories.
+Only write `<promise>ALL STORIES PROCESSED</promise>` when the user explicitly
+confirms they have no more stories to add.
 
 Pick the lowest-numbered `ready` story. NEVER process a `blocked` story.
 
@@ -24,12 +26,16 @@ Pick the lowest-numbered `ready` story. NEVER process a `blocked` story.
 
 ## No Stories? Collect Them
 
-If `stories.md` has no stories at all (first run, empty queue with no entries):
-1. Tell the user: *"No stories queued. Tell me what you want to build — describe features, problems, or goals in your own words."*
+**Triggers when:**
+- `stories.md` has no stories at all (first run, empty queue with no entries), OR
+- All stories in the queue are completed (`[x]`) and there are no `pending` stories left
+
+**Flow:**
+1. Tell the user: *"No pending stories. Tell me what you want to build — describe features, problems, or goals in your own words."*
 2. Use `AskUserQuestion` to prompt: "What do you want to build or fix next?" (open-ended)
-3. As the user narrates, capture each distinct idea as a `## STORY-{N}: {Title}` in `stories.md` with description and `**Depends on:** None` (or dependencies if mentioned)
+3. As the user narrates, capture each distinct idea as a `## STORY-{N}: {Title}` in `stories.md` (continue numbering from existing stories) with description and `**Depends on:** None` (or dependencies if mentioned)
 4. **Confirm stories & dependencies** — present all captured stories back. Use `AskUserQuestion` (up to 5 questions) to validate: correct stories? right dependency order? any to split/merge? priority adjustments?
-5. Apply corrections, finalize `stories.md`, proceed to normal flow
+5. Apply corrections, finalize `stories.md`, add new entries to tracker queue, proceed to normal flow
 
 ---
 
