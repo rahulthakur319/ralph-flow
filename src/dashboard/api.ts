@@ -665,6 +665,134 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
     }, 201);
   });
 
+  // ---------------------------------------------------------------------------
+  // Template config and prompt endpoints
+  // ---------------------------------------------------------------------------
+
+  // GET /api/templates/:name/config — get parsed template configuration
+  api.get('/api/templates/:name/config', (c) => {
+    const name = c.req.param('name');
+
+    // Path safety
+    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+      return c.json({ error: 'Invalid name' }, 400);
+    }
+
+    // Resolve template path (built-in or custom)
+    let templateDir: string;
+    try {
+      templateDir = resolveTemplatePathWithCustom(name, cwd);
+    } catch {
+      return c.json({ error: `Template "${name}" not found` }, 404);
+    }
+
+    // Load and parse config
+    try {
+      const config = loadConfig(templateDir);
+      return c.json(config);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: msg }, 500);
+    }
+  });
+
+  // GET /api/templates/:name/loops/:loopKey/prompt — read a template's prompt file
+  api.get('/api/templates/:name/loops/:loopKey/prompt', (c) => {
+    const name = c.req.param('name');
+    const loopKey = c.req.param('loopKey');
+
+    // Path safety
+    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+      return c.json({ error: 'Invalid name' }, 400);
+    }
+    if (loopKey.includes('..') || loopKey.includes('/') || loopKey.includes('\\')) {
+      return c.json({ error: 'Invalid loop key' }, 400);
+    }
+
+    // Resolve template path (built-in or custom)
+    let templateDir: string;
+    try {
+      templateDir = resolveTemplatePathWithCustom(name, cwd);
+    } catch {
+      return c.json({ error: `Template "${name}" not found` }, 404);
+    }
+
+    // Load config to find prompt path
+    let config: RalphFlowConfig;
+    try {
+      config = loadConfig(templateDir);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: msg }, 500);
+    }
+
+    const loopConfig = config.loops[loopKey];
+    if (!loopConfig) {
+      return c.json({ error: `Loop "${loopKey}" not found in template` }, 404);
+    }
+
+    // Resolve prompt path within template (files are under loops/ subdirectory)
+    const promptPath = resolve(templateDir, 'loops', loopConfig.prompt);
+    if (!promptPath.startsWith(resolve(templateDir))) {
+      return c.json({ error: 'Invalid path' }, 403);
+    }
+    if (!existsSync(promptPath)) {
+      return c.json({ error: 'prompt.md not found', content: '' }, 404);
+    }
+
+    const content = readFileSync(promptPath, 'utf-8');
+    return c.json({ path: loopConfig.prompt, content });
+  });
+
+  // PUT /api/templates/:name/loops/:loopKey/prompt — write a template's prompt file
+  api.put('/api/templates/:name/loops/:loopKey/prompt', async (c) => {
+    const name = c.req.param('name');
+    const loopKey = c.req.param('loopKey');
+
+    // Path safety
+    if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+      return c.json({ error: 'Invalid name' }, 400);
+    }
+    if (loopKey.includes('..') || loopKey.includes('/') || loopKey.includes('\\')) {
+      return c.json({ error: 'Invalid loop key' }, 400);
+    }
+
+    // Block writes to built-in templates
+    if ((BUILT_IN_TEMPLATES as readonly string[]).includes(name)) {
+      return c.json({ error: 'Cannot modify built-in template prompts' }, 403);
+    }
+
+    // Resolve custom template path
+    const customDir = join(cwd, '.ralph-flow', '.templates', name);
+    if (!existsSync(customDir) || !existsSync(join(customDir, 'ralphflow.yaml'))) {
+      return c.json({ error: `Custom template "${name}" not found` }, 404);
+    }
+
+    // Load config to find prompt path
+    let config: RalphFlowConfig;
+    try {
+      config = loadConfig(customDir);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: msg }, 500);
+    }
+
+    const loopConfig = config.loops[loopKey];
+    if (!loopConfig) {
+      return c.json({ error: `Loop "${loopKey}" not found in template` }, 404);
+    }
+
+    // Resolve prompt path within template (files are under loops/ subdirectory)
+    const promptPath = resolve(customDir, 'loops', loopConfig.prompt);
+    if (!promptPath.startsWith(resolve(customDir))) {
+      return c.json({ error: 'Invalid path' }, 403);
+    }
+
+    const body = await c.req.json<{ content: string }>();
+    writeFileSync(promptPath, body.content, 'utf-8');
+    return c.json({ ok: true });
+  });
+
   // POST /api/notification — receive a notification from a Claude hook
   api.post('/api/notification', async (c) => {
     const app = c.req.query('app') || 'unknown';
