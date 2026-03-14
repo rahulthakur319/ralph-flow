@@ -1301,6 +1301,88 @@
   .prompt-textarea:focus { border-color: var(--accent); outline: none; }
   .prompt-textarea::placeholder { color: var(--text-muted); }
 
+  /* Prompt Config Form */
+  .prompt-config-form { margin-top: 8px; }
+  .prompt-config-section {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .prompt-config-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+  .prompt-config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .prompt-config-grid .form-group { margin-bottom: 0; }
+  .prompt-config-readonly {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .stage-config-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  .stage-config-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .stage-config-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    padding: 2px 8px;
+    background: rgba(88,166,255,0.1);
+    border-radius: 4px;
+  }
+  .stage-config-index {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .capability-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .capability-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .capability-item:hover { background: var(--bg-surface); }
+  .capability-item input { margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+  .capability-item-text { display: flex; flex-direction: column; gap: 1px; }
+  .capability-item-label { font-size: 12px; color: var(--text); }
+  .capability-item-desc { font-size: 10px; color: var(--text-muted); }
+  .generate-prompt-btn {
+    width: 100%;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
   /* Prompt Builder */
   .prompt-builder {
     margin-top: 8px;
@@ -3130,8 +3212,32 @@
       showPrompt: false,
       prompt: '',
       useBuilder: false,
-      blocks: []
+      blocks: [],
+      inputFiles: '',
+      outputFiles: '',
+      stageConfigs: [],
+      showPromptForm: true
     };
+  }
+
+  const PROMPT_CAPABILITIES = [
+    { id: 'webSearch', label: 'Web search', desc: 'Search the internet for information' },
+    { id: 'mcpServers', label: 'MCP servers', desc: 'Connect to specific MCP tools' },
+    { id: 'exploreAgents', label: 'Explore agents', desc: 'Use Claude Code\'s Agent tool to explore the codebase' },
+    { id: 'fileReadWrite', label: 'File read/write', desc: 'Read or modify specific file types' },
+    { id: 'bashCommands', label: 'Bash commands', desc: 'Run shell commands, build, deploy' },
+    { id: 'codeEditing', label: 'Code editing', desc: 'Modify source code files' }
+  ];
+
+  function syncStageConfigs(loop) {
+    const existing = loop.stageConfigs || [];
+    loop.stageConfigs = loop.stages.map(stageName => {
+      const found = existing.find(sc => sc.name === stageName);
+      if (found) return found;
+      const caps = {};
+      PROMPT_CAPABILITIES.forEach(c => { caps[c.id] = false; });
+      return { name: stageName, description: '', capabilities: caps };
+    });
   }
 
   // Prompt builder block type definitions
@@ -3463,10 +3569,20 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     html += '<div class="builder-col-prompt">';
 
     if (loop) {
+      // Sync stage configs with current stages
+      syncStageConfigs(loop);
+      const showForm = loop.showPromptForm && !loop.prompt.trim();
+
       html += '<div class="builder-section">';
-      html += '<div class="builder-section-title">Prompt</div>';
+      html += `<div class="builder-section-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>Prompt</span>
+        ${loop.prompt.trim() ? `<button class="btn btn-muted" data-show-prompt-form="${si}" style="font-size:11px;padding:4px 10px">Generate New</button>` : ''}
+      </div>`;
       html += '<div class="prompt-section" style="margin-top:0;padding-top:0;border-top:none">';
-      if (loop.useBuilder) {
+
+      if (showForm) {
+        html += renderPromptConfigForm(si, loop);
+      } else if (loop.useBuilder) {
         html += renderPromptBuilderHTML(si, loop);
       } else {
         html += `<textarea class="prompt-textarea" data-prompt-idx="${si}" placeholder="Add your prompt here...">${esc(loop.prompt)}</textarea>`;
@@ -3492,6 +3608,189 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
 
     content.innerHTML = html;
     bindTemplateBuilderEvents();
+  }
+
+  function renderPromptConfigForm(loopIdx, loop) {
+    let html = '<div class="prompt-config-form" data-config-form-idx="' + loopIdx + '">';
+
+    // Per-loop settings
+    html += '<div class="prompt-config-section">';
+    html += '<div class="prompt-config-section-title">Loop Settings</div>';
+    html += '<div class="prompt-config-grid">';
+    html += `<div class="form-group"><label class="form-label">Input Files</label>
+      <input class="form-input" data-pcf-field="inputFiles" data-pcf-idx="${loopIdx}" type="text" value="${esc(loop.inputFiles || '')}" placeholder="stories.md, research.md" autocomplete="off"></div>`;
+    html += `<div class="form-group"><label class="form-label">Output Files</label>
+      <input class="form-input" data-pcf-field="outputFiles" data-pcf-idx="${loopIdx}" type="text" value="${esc(loop.outputFiles || '')}" placeholder="tasks.md, results.md" autocomplete="off"></div>`;
+    html += `<div class="form-group"><label class="form-label">Multi-agent</label>
+      <div class="prompt-config-readonly">${loop.multi_agent ? 'Enabled (' + (loop.max_agents || 3) + ' agents, ' + (loop.strategy || 'parallel') + ')' : 'Disabled'}</div></div>`;
+    html += `<div class="form-group"><label class="form-label">Tracker Format</label>
+      <div class="prompt-config-readonly">Standard RalphFlow tracker &mdash; auto-generated</div></div>`;
+    html += '</div></div>';
+
+    // Per-stage configuration
+    html += '<div class="prompt-config-section">';
+    html += '<div class="prompt-config-section-title">Stage Configuration</div>';
+
+    if (loop.stages.length === 0) {
+      html += '<div style="color:var(--text-muted);font-size:12px;padding:8px 0">Add stages in the loop config above to configure per-stage instructions.</div>';
+    }
+
+    loop.stageConfigs.forEach((sc, sci) => {
+      html += '<div class="stage-config-card">';
+      html += '<div class="stage-config-header">';
+      html += `<span class="stage-config-name">${esc(sc.name)}</span>`;
+      html += `<span class="stage-config-index">Stage ${sci + 1} of ${loop.stageConfigs.length}</span>`;
+      html += '</div>';
+
+      html += `<div class="form-group" style="margin-bottom:8px"><label class="form-label">What should this stage do?</label>
+        <textarea class="form-input" data-pcf-stage-desc data-pcf-idx="${loopIdx}" data-pcf-stage="${sci}" style="min-height:60px;resize:vertical;font-family:var(--sans);font-size:13px;line-height:1.5" placeholder="Describe the purpose and work of this stage...">${esc(sc.description)}</textarea></div>`;
+
+      html += '<label class="form-label">Capabilities</label>';
+      html += '<div class="capability-grid">';
+      PROMPT_CAPABILITIES.forEach(cap => {
+        const checked = sc.capabilities[cap.id] ? ' checked' : '';
+        html += `<label class="capability-item">
+          <input type="checkbox" data-pcf-cap data-pcf-idx="${loopIdx}" data-pcf-stage="${sci}" data-pcf-cap-id="${cap.id}"${checked}>
+          <span class="capability-item-text">
+            <span class="capability-item-label">${esc(cap.label)}</span>
+            <span class="capability-item-desc">${esc(cap.desc)}</span>
+          </span>
+        </label>`;
+      });
+      html += '</div>';
+      html += '</div>';
+    });
+
+    html += '</div>';
+
+    // Generate button
+    html += `<button class="btn btn-primary generate-prompt-btn" data-generate-prompt="${loopIdx}">Generate Prompt</button>`;
+
+    html += '</div>';
+    return html;
+  }
+
+  function generatePromptFromConfig(loop, loopIndex, allLoops) {
+    const loopName = loop.name || 'Loop ' + (loopIndex + 1);
+    const inputFiles = loop.inputFiles || 'input.md';
+    const outputFiles = loop.outputFiles || 'output.md';
+    const completion = loop.completion || 'LOOP COMPLETE';
+
+    let prompt = '';
+
+    // Header / Identity
+    prompt += `# ${loopName} Loop\n\n`;
+    prompt += `**App:** \`{{APP_NAME}}\` — all flow files live under \`.ralph-flow/{{APP_NAME}}/\`.\n\n`;
+    if (loop.multi_agent) {
+      prompt += `**You are agent \`{{AGENT_NAME}}\`.** Multiple agents may work in parallel.\n`;
+      prompt += `Coordinate via \`tracker.md\` — the single source of truth.\n\n`;
+    }
+    prompt += `Read tracker.md FIRST to determine where you are.\n\n`;
+    prompt += `> **PROJECT CONTEXT.** Read \`CLAUDE.md\` for architecture, stack, conventions, commands, and URLs.\n\n`;
+    prompt += `**Pipeline:** \`${inputFiles} → YOU → ${outputFiles}\`\n\n`;
+    prompt += `---\n\n`;
+
+    // Multi-agent sections
+    if (loop.multi_agent) {
+      prompt += `## Tracker Lock Protocol\n\n`;
+      prompt += `Before ANY write to \`tracker.md\`, you MUST acquire the lock:\n\n`;
+      prompt += `**Lock file:** \`.ralph-flow/{{APP_NAME}}/{loop_dir}/.tracker-lock\`\n\n`;
+      prompt += `### Acquire Lock\n`;
+      prompt += `1. Check if \`.tracker-lock\` exists\n`;
+      prompt += `   - Exists AND file is < 60 seconds old → sleep 2s, retry (up to 5 retries)\n`;
+      prompt += `   - Exists AND file is ≥ 60 seconds old → stale lock, delete it\n`;
+      prompt += `   - Does not exist → continue\n`;
+      prompt += `2. Write lock: \`echo "{{AGENT_NAME}} $(date -u +%Y-%m-%dT%H:%M:%SZ)" > .tracker-lock\`\n`;
+      prompt += `3. Sleep 500ms (\`sleep 0.5\`)\n`;
+      prompt += `4. Re-read \`.tracker-lock\` — verify YOUR agent name is in it\n`;
+      prompt += `   - Your name → you own the lock, proceed\n`;
+      prompt += `   - Other name → you lost the race, retry from step 1\n`;
+      prompt += `5. Write your changes to \`tracker.md\`\n`;
+      prompt += `6. Delete \`.tracker-lock\` immediately\n\n`;
+      prompt += `---\n\n`;
+
+      prompt += `## Item Selection Algorithm\n\n`;
+      prompt += `1. Parse tracker — check completed items and dependencies\n`;
+      prompt += `2. Resume own work — if any item has \`{agent: {{AGENT_NAME}}, status: in_progress}\`, resume it\n`;
+      prompt += `3. Find claimable — filter items where \`status: pending\` AND \`agent: -\`\n`;
+      prompt += `4. Claim — acquire lock, set your agent name and status, release lock\n`;
+      prompt += `5. Nothing available → log "waiting", exit: \`kill -INT $PPID\`\n\n`;
+      prompt += `---\n\n`;
+
+      prompt += `## Anti-Hijacking Rules\n\n`;
+      prompt += `1. **Never touch another agent's \`in_progress\` item**\n`;
+      prompt += `2. **Respect ownership** — if another agent is active in a group, leave remaining group items for them\n`;
+      prompt += `3. **Log file overlap conflicts** as WARNINGs\n\n`;
+      prompt += `---\n\n`;
+
+      prompt += `## Heartbeat Protocol\n\n`;
+      prompt += `Every tracker write includes updating your \`last_heartbeat\` to current ISO 8601 timestamp.\n\n`;
+      prompt += `---\n\n`;
+
+      prompt += `## Crash Recovery\n\n`;
+      prompt += `On fresh start, if your agent has an \`in_progress\` item but you have no memory of it:\n`;
+      prompt += `- Work committed → resume at verify stage\n`;
+      prompt += `- No commits found → restart from first stage\n\n`;
+      prompt += `---\n\n`;
+    }
+
+    // State Machine
+    prompt += `## State Machine\n\n\`\`\`\n`;
+    loop.stages.forEach((stage, i) => {
+      const stageConfig = loop.stageConfigs[i];
+      const desc = stageConfig ? stageConfig.description || 'Complete this stage' : 'Complete this stage';
+      const next = i < loop.stages.length - 1 ? `→ stage: ${loop.stages[i + 1]}` : '→ done';
+      prompt += `${stage.toUpperCase()}  → ${desc.split('\n')[0].substring(0, 60)}  ${next}\n`;
+    });
+    prompt += `\`\`\`\n\n`;
+    prompt += `When ALL done: \`<promise>${completion}</promise>\`\n\n`;
+    prompt += `After completing ANY stage, exit: \`kill -INT $PPID\`\n\n`;
+    prompt += `---\n\n`;
+
+    // Stage Instructions
+    loop.stages.forEach((stage, i) => {
+      const sc = loop.stageConfigs[i];
+      const num = i + 1;
+      prompt += `## STAGE ${num}: ${stage.toUpperCase()}\n\n`;
+
+      if (sc && sc.description) {
+        prompt += `${sc.description}\n\n`;
+      }
+
+      let step = 1;
+      prompt += `${step++}. Read tracker → determine current state\n`;
+
+      if (sc && sc.capabilities) {
+        if (sc.capabilities.fileReadWrite) prompt += `${step++}. Read relevant input files and explore affected areas\n`;
+        if (sc.capabilities.exploreAgents) prompt += `${step++}. Use the Agent tool to explore the codebase for context\n`;
+        if (sc.capabilities.webSearch) prompt += `${step++}. Use WebSearch for 5-10 queries to gather external information\n`;
+        if (sc.capabilities.codeEditing) prompt += `${step++}. Implement changes, matching existing patterns\n`;
+        if (sc.capabilities.bashCommands) prompt += `${step++}. Run build/deploy commands to verify changes\n`;
+        if (sc.capabilities.mcpServers) prompt += `${step++}. Use MCP tools for specialized operations\n`;
+      }
+
+      if (loop.multi_agent) {
+        prompt += `${step++}. Acquire lock → update tracker: stage, last_heartbeat, log entry → release lock\n`;
+      } else {
+        prompt += `${step++}. Update tracker with progress\n`;
+      }
+      prompt += `${step++}. Exit: \`kill -INT $PPID\`\n\n`;
+
+      if (i < loop.stages.length - 1) prompt += `---\n\n`;
+    });
+
+    // Rules
+    prompt += `---\n\n## Rules\n\n`;
+    prompt += `- One item at a time. One stage per iteration.\n`;
+    prompt += `- Read tracker first, update tracker last.\n`;
+    prompt += `- Read \`CLAUDE.md\` for all project-specific context.\n`;
+    prompt += `- Thorough exploration before making changes.\n`;
+    if (loop.multi_agent) {
+      prompt += `- **Multi-agent: never touch another agent's in_progress item. Coordinate via tracker.md.**\n`;
+      prompt += `- Always use lock protocol for tracker writes.\n`;
+    }
+
+    return prompt;
   }
 
   function renderPromptBuilderHTML(loopIdx, loop) {
@@ -3556,6 +3855,97 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     html += '</div>';
 
     return html;
+  }
+
+  function bindPromptConfigFormEvents() {
+    // Input/output file fields
+    content.querySelectorAll('[data-pcf-field]').forEach(input => {
+      input.addEventListener('input', () => {
+        const idx = parseInt(input.dataset.pcfIdx);
+        const field = input.dataset.pcfField;
+        if (templateBuilderState && templateBuilderState.loops[idx]) {
+          templateBuilderState.loops[idx][field] = input.value;
+        }
+      });
+    });
+
+    // Stage description textareas
+    content.querySelectorAll('[data-pcf-stage-desc]').forEach(textarea => {
+      textarea.addEventListener('input', () => {
+        const idx = parseInt(textarea.dataset.pcfIdx);
+        const stageIdx = parseInt(textarea.dataset.pcfStage);
+        const loop = templateBuilderState && templateBuilderState.loops[idx];
+        if (loop && loop.stageConfigs[stageIdx]) {
+          loop.stageConfigs[stageIdx].description = textarea.value;
+        }
+      });
+    });
+
+    // Capability checkboxes
+    content.querySelectorAll('[data-pcf-cap]').forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        const idx = parseInt(checkbox.dataset.pcfIdx);
+        const stageIdx = parseInt(checkbox.dataset.pcfStage);
+        const capId = checkbox.dataset.pcfCapId;
+        const loop = templateBuilderState && templateBuilderState.loops[idx];
+        if (loop && loop.stageConfigs[stageIdx]) {
+          loop.stageConfigs[stageIdx].capabilities[capId] = checkbox.checked;
+        }
+      });
+    });
+
+    // "Generate Prompt" button
+    content.querySelectorAll('[data-generate-prompt]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        capturePromptConfigFormInputs();
+        const idx = parseInt(btn.dataset.generatePrompt);
+        const loop = templateBuilderState.loops[idx];
+        loop.prompt = generatePromptFromConfig(loop, idx, templateBuilderState.loops);
+        loop.showPromptForm = false;
+        renderTemplateBuilder();
+      });
+    });
+
+    // "Generate New" button (switch back to form)
+    content.querySelectorAll('[data-show-prompt-form]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        captureBuilderInputs();
+        const idx = parseInt(btn.dataset.showPromptForm);
+        const loop = templateBuilderState.loops[idx];
+        loop.showPromptForm = true;
+        loop.prompt = '';
+        loop.useBuilder = false;
+        renderTemplateBuilder();
+      });
+    });
+  }
+
+  function capturePromptConfigFormInputs() {
+    if (!templateBuilderState) return;
+    content.querySelectorAll('[data-pcf-field]').forEach(input => {
+      const idx = parseInt(input.dataset.pcfIdx);
+      const field = input.dataset.pcfField;
+      if (templateBuilderState.loops[idx]) {
+        templateBuilderState.loops[idx][field] = input.value;
+      }
+    });
+    content.querySelectorAll('[data-pcf-stage-desc]').forEach(textarea => {
+      const idx = parseInt(textarea.dataset.pcfIdx);
+      const stageIdx = parseInt(textarea.dataset.pcfStage);
+      const loop = templateBuilderState.loops[idx];
+      if (loop && loop.stageConfigs[stageIdx]) {
+        loop.stageConfigs[stageIdx].description = textarea.value;
+      }
+    });
+    content.querySelectorAll('[data-pcf-cap]').forEach(checkbox => {
+      const idx = parseInt(checkbox.dataset.pcfIdx);
+      const stageIdx = parseInt(checkbox.dataset.pcfStage);
+      const capId = checkbox.dataset.pcfCapId;
+      const loop = templateBuilderState.loops[idx];
+      if (loop && loop.stageConfigs[stageIdx]) {
+        loop.stageConfigs[stageIdx].capabilities[capId] = checkbox.checked;
+      }
+    });
   }
 
   function bindPromptBuilderEvents() {
@@ -3904,6 +4294,9 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
     // Drag-and-drop reordering for minimap nodes and loop cards
     setupBuilderDragAndDrop();
 
+    // Prompt config form events
+    bindPromptConfigFormEvents();
+
     // Prompt builder events
     bindPromptBuilderEvents();
   }
@@ -4001,6 +4394,9 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
         state.loops[idx].prompt = textarea.value;
       }
     });
+
+    // Capture prompt config form inputs
+    capturePromptConfigFormInputs();
 
     // Capture prompt builder block contents
     capturePromptBuilderInputs();
@@ -4206,7 +4602,13 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
           entities: loop.entities || [],
           showOptional: dataFiles.length > 0 || (loop.entities && loop.entities.length > 0),
           showPrompt: false,
-          prompt: ''
+          prompt: '',
+          useBuilder: false,
+          blocks: [],
+          inputFiles: (loop.fed_by || []).join(', '),
+          outputFiles: (loop.feeds || []).join(', '),
+          stageConfigs: [],
+          showPromptForm: false
         };
 
         // Load prompt content
@@ -4218,6 +4620,8 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
           }
         } catch { /* prompt load is best-effort */ }
 
+        // Show form if no prompt content loaded
+        loopState.showPromptForm = !loopState.prompt.trim();
         loops.push(loopState);
       }
 
