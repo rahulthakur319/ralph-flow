@@ -2052,6 +2052,25 @@
     return html;
   }
 
+  function calculatePipelineProgress(loops) {
+    const perLoop = [];
+    let aggCompleted = 0;
+    let aggTotal = 0;
+    for (const loop of (loops || [])) {
+      const st = loop.status || {};
+      const completed = st.completed || 0;
+      const total = st.total || 0;
+      const fraction = total > 0 ? completed / total : 0;
+      perLoop.push({ key: loop.key, completed, total, fraction });
+      if (total > 0) {
+        aggCompleted += completed;
+        aggTotal += total;
+      }
+    }
+    const percentage = aggTotal > 0 ? Math.round(aggCompleted / aggTotal * 100) : 0;
+    return { perLoop, completed: aggCompleted, total: aggTotal, percentage };
+  }
+
   function formatModelName(model) {
     if (!model) return null;
     return model.replace(/^claude-/, '');
