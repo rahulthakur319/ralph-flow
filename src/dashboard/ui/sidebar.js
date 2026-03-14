@@ -76,6 +76,9 @@ export function selectApp(app) {
   state.expandedArchive = null;
   state.archiveFilesCache = {};
   state.viewingArchiveFile = null;
+  state.viewingTemplateName = null;
+  state.viewingTemplateConfig = null;
+  state.viewingTemplatePrompts = {};
   document.title = app.appName + ' - RalphFlow Dashboard';
   renderSidebar();
   actions.renderContent();

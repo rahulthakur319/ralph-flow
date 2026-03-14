@@ -1304,6 +1304,105 @@ body {
   color: var(--text-muted);
 }
 
+/* Template detail/preview page */
+.detail-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  padding: 8px 0;
+}
+.detail-loops {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.detail-loop-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transition: border-color 0.3s;
+}
+.detail-loop-card.highlighted {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.detail-loop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.detail-loop-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.detail-loop-index {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.detail-loop-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.detail-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.detail-meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.detail-meta-value {
+  font-size: 13px;
+  color: var(--text);
+}
+.detail-prompt-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.detail-prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.detail-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-prompt-editor {
+  width: 100%;
+  min-height: 200px;
+  max-height: 500px;
+  resize: vertical;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.detail-prompt-editor:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.detail-prompt-editor.readonly {
+  color: var(--text-dim);
+  cursor: default;
+}
+
 /* Template builder */
 .template-builder { max-width: none; display: grid; grid-template-columns: 280px 1fr; grid-template-rows: auto auto auto; gap: 0 20px; }
 .builder-col-overview { grid-column: 1; grid-row: 1 / 4; }

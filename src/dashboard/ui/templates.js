@@ -1,7 +1,7 @@
 // Template listing, builder UI, drag-and-drop, YAML preview, save/load/delete/clone.
 
 import { state, dom, actions } from './state.js';
-import { fetchJson, esc } from './utils.js';
+import { fetchJson, esc, formatModelName } from './utils.js';
 import {
   syncStageConfigs,
   createEmptyLoop,
@@ -26,6 +26,11 @@ export async function renderTemplatesPage() {
     return;
   }
 
+  if (state.viewingTemplateName) {
+    renderTemplateDetail();
+    return;
+  }
+
   await fetchTemplates();
 
   let html = '<div class="templates-header">';
@@ -38,7 +43,7 @@ export async function renderTemplatesPage() {
   } else {
     html += '<div class="template-grid">';
     for (const tpl of state.templatesList) {
-      html += `<div class="template-card">
+      html += `<div class="template-card" data-view-template="${esc(tpl.name)}" style="cursor:pointer">
         <div class="template-card-header">
           <span class="template-card-name">${esc(tpl.name)}</span>
           <span class="template-card-type ${tpl.type}">${esc(tpl.type)}</span>
@@ -46,7 +51,9 @@ export async function renderTemplatesPage() {
         ${tpl.description ? `<div class="template-card-desc">${esc(tpl.description)}</div>` : ''}
         <div class="template-card-meta">
           <span>${tpl.loopCount} loop${tpl.loopCount !== 1 ? 's' : ''}</span>
+          <span class="template-card-actions" data-stop-prop="true">
           ${tpl.type === 'custom' ? `<button class="btn" style="font-size:11px;padding:2px 8px" data-edit-template="${esc(tpl.name)}">Edit</button><button class="btn btn-danger" style="font-size:11px;padding:2px 8px;margin-left:4px" data-delete-template="${esc(tpl.name)}">Delete</button>` : `<button class="btn" style="font-size:11px;padding:2px 8px" data-clone-template="${esc(tpl.name)}">Clone</button>`}
+          </span>
         </div>
       </div>`;
     }
@@ -66,17 +73,282 @@ export async function renderTemplatesPage() {
     });
   }
 
+  // Template card click → open detail view
+  dom.content.querySelectorAll('[data-view-template]').forEach(card => {
+    card.addEventListener('click', (e) => {
+      // Don't open detail view if an action button was clicked
+      if (e.target.closest('[data-stop-prop]') || e.target.closest('button')) return;
+      openTemplateDetail(card.dataset.viewTemplate);
+    });
+  });
+
   dom.content.querySelectorAll('[data-edit-template]').forEach(btn => {
-    btn.addEventListener('click', () => loadTemplateForEdit(btn.dataset.editTemplate));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      loadTemplateForEdit(btn.dataset.editTemplate);
+    });
   });
 
   dom.content.querySelectorAll('[data-delete-template]').forEach(btn => {
-    btn.addEventListener('click', () => openDeleteTemplateModal(btn.dataset.deleteTemplate));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDeleteTemplateModal(btn.dataset.deleteTemplate);
+    });
   });
 
   dom.content.querySelectorAll('[data-clone-template]').forEach(btn => {
-    btn.addEventListener('click', () => openCloneTemplateModal(btn.dataset.cloneTemplate));
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCloneTemplateModal(btn.dataset.cloneTemplate);
+    });
   });
+}
+
+// -----------------------------------------------------------------------
+// Template detail/preview page
+// -----------------------------------------------------------------------
+
+async function openTemplateDetail(templateName) {
+  state.viewingTemplateName = templateName;
+  state.viewingTemplateConfig = null;
+  state.viewingTemplatePrompts = {};
+
+  // Show loading state immediately
+  dom.content.innerHTML = '<div class="content-empty">Loading template...</div>';
+
+  try {
+    const config = await fetchJson('/api/templates/' + encodeURIComponent(templateName) + '/config');
+    state.viewingTemplateConfig = config;
+
+    // Load prompts for all loops
+    const sortedLoops = Object.entries(config.loops)
+      .sort(([, a], [, b]) => a.order - b.order);
+
+    for (const [loopKey] of sortedLoops) {
+      try {
+        const promptData = await fetchJson('/api/templates/' + encodeURIComponent(templateName) + '/loops/' + encodeURIComponent(loopKey) + '/prompt');
+        state.viewingTemplatePrompts[loopKey] = promptData.content || '';
+      } catch {
+        state.viewingTemplatePrompts[loopKey] = '';
+      }
+    }
+
+    renderTemplateDetail();
+  } catch {
+    dom.content.innerHTML = '<div class="content-empty">Failed to load template</div>';
+  }
+}
+
+function renderTemplateDetail() {
+  const config = state.viewingTemplateConfig;
+  const templateName = state.viewingTemplateName;
+  if (!config || !templateName) return;
+
+  const tpl = state.templatesList.find(t => t.name === templateName);
+  const isCustom = tpl ? tpl.type === 'custom' : false;
+
+  const sortedLoops = Object.entries(config.loops)
+    .sort(([, a], [, b]) => a.order - b.order);
+
+  let html = '';
+
+  // Header
+  html += '<div class="templates-header">';
+  html += `<div style="display:flex;align-items:center;gap:12px">
+    <button class="btn btn-muted" id="detailBackBtn" style="padding:4px 10px">&larr; Back</button>
+    <h2>${esc(config.name || templateName)}</h2>
+    <span class="template-card-type ${isCustom ? 'custom' : 'built-in'}">${isCustom ? 'custom' : 'built-in'}</span>
+  </div>`;
+  if (isCustom) {
+    html += `<button class="btn" id="detailEditBtn" style="font-size:12px;padding:4px 12px">Edit in Builder</button>`;
+  }
+  html += '</div>';
+
+  if (config.description) {
+    html += `<div style="color:var(--text-dim);font-size:13px;margin-bottom:20px">${esc(config.description)}</div>`;
+  }
+
+  // Pipeline minimap (read-only)
+  html += '<div class="section" style="margin-bottom:24px">';
+  html += '<div class="builder-section-title">Pipeline</div>';
+  html += '<div class="detail-pipeline">';
+  sortedLoops.forEach(([loopKey, loop], i) => {
+    if (i > 0) {
+      const prevFeeds = sortedLoops[i - 1][1].feeds || [];
+      const curFedBy = loop.fed_by || [];
+      const shared = prevFeeds.filter(f => curFedBy.includes(f));
+      if (shared.length > 0) {
+        html += `<div class="pipeline-connector-wrap">
+          <div class="pipeline-connector"></div>
+          <span class="connector-file" title="${esc(shared.join(', '))}">${esc(shared.join(', '))}</span>
+        </div>`;
+      } else {
+        html += '<div class="pipeline-connector"></div>';
+      }
+    }
+    const modelDisplay = formatModelName(loop.model);
+    const fedBy = loop.fed_by || [];
+    const feeds = loop.feeds || [];
+    const inputIo = fedBy.length > 0 ? `<div class="node-io node-io-in">${fedBy.map(f => `<span class="node-io-label" title="input: ${esc(f)}">${esc(f)}</span>`).join('')}</div>` : '';
+    const outputIo = feeds.length > 0 ? `<div class="node-io node-io-out">${feeds.map(f => `<span class="node-io-label" title="output: ${esc(f)}">${esc(f)}</span>`).join('')}</div>` : '';
+    html += `<div class="pipeline-node" data-detail-loop="${esc(loopKey)}">
+      ${inputIo}
+      <span class="node-name">${esc(loop.name)}</span>
+      <span class="node-status-row">
+        <span class="node-model${modelDisplay ? '' : ' node-model-default'}">${modelDisplay ? esc(modelDisplay) : 'default'}</span>
+      </span>
+      ${outputIo}
+    </div>`;
+  });
+  html += '</div></div>';
+
+  // Loop detail cards
+  html += '<div class="detail-loops">';
+  sortedLoops.forEach(([loopKey, loop], i) => {
+    const stages = loop.stages || [];
+    const fedBy = loop.fed_by || [];
+    const feeds = loop.feeds || [];
+    const modelDisplay = formatModelName(loop.model);
+    const promptContent = state.viewingTemplatePrompts[loopKey] || '';
+
+    html += `<div class="detail-loop-card" id="detail-loop-${esc(loopKey)}">`;
+    html += `<div class="detail-loop-header">
+      <h3>${esc(loop.name)}</h3>
+      <span class="detail-loop-index">Loop ${i + 1}</span>
+    </div>`;
+
+    // Config summary
+    html += '<div class="detail-loop-meta">';
+    if (modelDisplay) {
+      html += `<div class="detail-meta-item"><span class="detail-meta-label">Model</span><span class="detail-meta-value">${esc(modelDisplay)}</span></div>`;
+    }
+    if (stages.length > 0) {
+      html += `<div class="detail-meta-item"><span class="detail-meta-label">Stages</span><span class="detail-meta-value">${stages.map(s => esc(s)).join(' &rarr; ')}</span></div>`;
+    }
+    if (loop.completion) {
+      html += `<div class="detail-meta-item"><span class="detail-meta-label">Completion</span><span class="detail-meta-value" style="font-family:var(--mono);font-size:11px">${esc(loop.completion)}</span></div>`;
+    }
+    if (fedBy.length > 0) {
+      html += `<div class="detail-meta-item"><span class="detail-meta-label">Input</span><span class="detail-meta-value">${fedBy.map(f => `<code style="font-family:var(--mono);font-size:11px">${esc(f)}</code>`).join(', ')}</span></div>`;
+    }
+    if (feeds.length > 0) {
+      html += `<div class="detail-meta-item"><span class="detail-meta-label">Output</span><span class="detail-meta-value">${feeds.map(f => `<code style="font-family:var(--mono);font-size:11px">${esc(f)}</code>`).join(', ')}</span></div>`;
+    }
+    if (loop.claude_args && loop.claude_args.length > 0) {
+      html += `<div class="detail-meta-item"><span class="detail-meta-label">CLI Args</span><span class="detail-meta-value" style="font-family:var(--mono);font-size:11px">${loop.claude_args.map(a => esc(a)).join(' ')}</span></div>`;
+    }
+    html += '</div>';
+
+    // Prompt
+    html += '<div class="detail-prompt-section">';
+    html += `<div class="detail-prompt-header">
+      <span class="detail-meta-label">Prompt</span>
+      ${isCustom ? `<span class="detail-prompt-actions">
+        <button class="btn btn-primary detail-save-prompt" data-save-loop="${esc(loopKey)}" style="font-size:11px;padding:3px 10px" disabled>Save</button>
+        <span class="save-ok detail-save-ok" data-save-ok="${esc(loopKey)}" style="display:none">Saved</span>
+      </span>` : ''}
+    </div>`;
+    html += `<textarea class="detail-prompt-editor${isCustom ? '' : ' readonly'}" data-detail-prompt="${esc(loopKey)}" ${isCustom ? '' : 'readonly'} placeholder="No prompt content">${esc(promptContent)}</textarea>`;
+    html += '</div>';
+
+    html += '</div>'; // close detail-loop-card
+  });
+  html += '</div>';
+
+  dom.content.innerHTML = html;
+
+  // Bind events
+  const backBtn = document.getElementById('detailBackBtn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      state.viewingTemplateName = null;
+      state.viewingTemplateConfig = null;
+      state.viewingTemplatePrompts = {};
+      renderTemplatesPage();
+    });
+  }
+
+  const editBtn = document.getElementById('detailEditBtn');
+  if (editBtn) {
+    editBtn.addEventListener('click', () => {
+      const name = state.viewingTemplateName;
+      state.viewingTemplateName = null;
+      state.viewingTemplateConfig = null;
+      state.viewingTemplatePrompts = {};
+      loadTemplateForEdit(name);
+    });
+  }
+
+  // Pipeline node click → scroll to loop card
+  dom.content.querySelectorAll('[data-detail-loop]').forEach(node => {
+    node.style.cursor = 'pointer';
+    node.addEventListener('click', () => {
+      const loopKey = node.dataset.detailLoop;
+      const card = document.getElementById('detail-loop-' + loopKey);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        card.classList.add('highlighted');
+        setTimeout(() => card.classList.remove('highlighted'), 1500);
+      }
+    });
+  });
+
+  // Prompt editing (custom templates only)
+  if (isCustom) {
+    dom.content.querySelectorAll('.detail-prompt-editor:not(.readonly)').forEach(textarea => {
+      const loopKey = textarea.dataset.detailPrompt;
+      const originalContent = state.viewingTemplatePrompts[loopKey] || '';
+
+      textarea.addEventListener('input', () => {
+        const saveBtn = dom.content.querySelector(`.detail-save-prompt[data-save-loop="${loopKey}"]`);
+        if (saveBtn) saveBtn.disabled = textarea.value === originalContent;
+      });
+
+      textarea.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+          e.preventDefault();
+          saveDetailPrompt(loopKey, textarea);
+        }
+      });
+    });
+
+    dom.content.querySelectorAll('.detail-save-prompt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const loopKey = btn.dataset.saveLoop;
+        const textarea = dom.content.querySelector(`.detail-prompt-editor[data-detail-prompt="${loopKey}"]`);
+        if (textarea) saveDetailPrompt(loopKey, textarea);
+      });
+    });
+  }
+}
+
+async function saveDetailPrompt(loopKey, textarea) {
+  const templateName = state.viewingTemplateName;
+  if (!templateName) return;
+
+  try {
+    const res = await fetch('/api/templates/' + encodeURIComponent(templateName) + '/loops/' + encodeURIComponent(loopKey) + '/prompt', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: textarea.value }),
+    });
+
+    if (!res.ok) {
+      alert('Failed to save prompt');
+      return;
+    }
+
+    state.viewingTemplatePrompts[loopKey] = textarea.value;
+    const saveBtn = dom.content.querySelector(`.detail-save-prompt[data-save-loop="${loopKey}"]`);
+    if (saveBtn) saveBtn.disabled = true;
+    const saveOk = dom.content.querySelector(`.detail-save-ok[data-save-ok="${loopKey}"]`);
+    if (saveOk) {
+      saveOk.style.display = 'inline';
+      setTimeout(() => { saveOk.style.display = 'none'; }, 2000);
+    }
+  } catch {
+    alert('Failed to save prompt');
+  }
 }
 
 export function renderTemplateBuilder() {

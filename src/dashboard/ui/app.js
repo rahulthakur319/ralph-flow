@@ -177,6 +177,9 @@ document.getElementById('templatesNav').addEventListener('click', () => {
   state.showTemplateBuilder = false;
   state.templateBuilderState = null;
   state.editingTemplateName = null;
+  state.viewingTemplateName = null;
+  state.viewingTemplateConfig = null;
+  state.viewingTemplatePrompts = {};
   document.title = 'Templates - RalphFlow Dashboard';
   renderSidebar();
   renderContent();

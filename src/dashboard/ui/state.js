@@ -41,6 +41,9 @@ export const state = {
   templateBuilderState: null,
   editingTemplateName: null,
   selectedBuilderLoop: 0,
+  viewingTemplateName: null,
+  viewingTemplateConfig: null,
+  viewingTemplatePrompts: {},
 };
 
 // Cross-module function registry.
