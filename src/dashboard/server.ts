@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import chalk from 'chalk';
@@ -14,16 +14,22 @@ import type { Duplex } from 'node:stream';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function resolveUiPath(): string {
+const CONTENT_TYPES: Record<string, string> = {
+  '.css': 'text/css',
+  '.js': 'text/javascript',
+  '.html': 'text/html',
+};
+
+function resolveUiDir(): string {
   const candidates = [
-    join(__dirname, '..', 'dashboard', 'ui', 'index.html'),     // dev: src/dashboard/ -> src/dashboard/ui/
-    join(__dirname, '..', 'src', 'dashboard', 'ui', 'index.html'), // bundled: dist/ -> src/dashboard/ui/
+    join(__dirname, '..', 'dashboard', 'ui'),     // dev: src/dashboard/ -> src/dashboard/ui/
+    join(__dirname, '..', 'src', 'dashboard', 'ui'), // bundled: dist/ -> src/dashboard/ui/
   ];
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
+    if (existsSync(join(candidate, 'index.html'))) return candidate;
   }
   throw new Error(
-    `Dashboard UI not found. Searched:\n${candidates.join('\n')}`
+    `Dashboard UI not found. Searched:\n${candidates.map(c => join(c, 'index.html')).join('\n')}`
   );
 }
 
@@ -45,11 +51,23 @@ export async function startDashboard(options: { cwd: string; port?: number }): P
   const apiRoutes = createApiRoutes(cwd, port, wss);
   app.route('/', apiRoutes);
 
-  // Serve index.html at root
+  // Serve static UI files
+  const uiDir = resolveUiDir();
+
   app.get('/', (c) => {
-    const htmlPath = resolveUiPath();
-    const html = readFileSync(htmlPath, 'utf-8');
+    const html = readFileSync(join(uiDir, 'index.html'), 'utf-8');
     return c.html(html);
+  });
+
+  app.get('/:file{.+\\.(css|js)$}', (c) => {
+    const file = c.req.param('file');
+    const filePath = join(uiDir, file);
+    if (!filePath.startsWith(uiDir) || !existsSync(filePath)) {
+      return c.notFound();
+    }
+    const content = readFileSync(filePath, 'utf-8');
+    const contentType = CONTENT_TYPES[extname(filePath)] || 'text/plain';
+    return c.text(content, 200, { 'Content-Type': contentType });
   });
 
   // Start HTTP server
