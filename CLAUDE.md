@@ -13,7 +13,8 @@ src/
 │   ├── run.ts                — `run <loop>` command: single/multi-agent loop execution, --ui flag
 │   ├── e2e.ts                — `e2e` command: orchestrated all-loops execution with SQLite, --ui flag
 │   ├── status.ts             — `status` command: renders loop status table
-│   └── dashboard.ts          — `dashboard` command (alias: `ui`): starts web server
+│   ├── dashboard.ts          — `dashboard` command (alias: `ui`): starts web server
+│   └── create-template.ts    — `create-template` command: create custom template from JSON definition
 ├── core/
 │   ├── index.ts              — Public API re-exports
 │   ├── types.ts              — All TypeScript interfaces (RalphFlowConfig, LoopConfig, TrackerStatus, etc.)
@@ -23,7 +24,8 @@ src/
 │   ├── db.ts                 — SQLite (better-sqlite3, WAL mode): loop_state table, status tracking
 │   ├── status.ts             — parseTracker(): regex-based tracker.md parsing (stage, checkboxes, agents)
 │   ├── init.ts               — initProject(): scaffold .ralph-flow/<name>/ from template
-│   └── template.ts           — Template path resolution (dev vs bundled), file copying, custom template CRUD
+│   ├── template.ts           — Template path resolution (dev vs bundled), file copying, custom template CRUD
+│   └── prompt-generator.ts   — Server-side prompt generation engine (ported from ui/prompt-builder.js)
 ├── dashboard/
 │   ├── server.ts             — Hono HTTP + WebSocket server on 127.0.0.1:4242
 │   ├── api.ts                — REST endpoints: /api/apps, status, config, db, prompt CRUD, tracker, files, archives, templates
@@ -102,8 +104,11 @@ ralphflow
 │   └── -f, --flow
 ├── status                 → show loop status
 │   └── -f, --flow
-└── dashboard (alias: ui)  → start web dashboard
-    └── -p, --port         (default 4242)
+├── dashboard (alias: ui)  → start web dashboard
+│   └── -p, --port         (default 4242)
+└── create-template        → create custom template from JSON
+    ├── --config <json>    inline JSON template definition
+    └── --config-file <path> path to JSON file
 ```
 
 ## Key Patterns
@@ -125,6 +130,12 @@ Each loop in `ralphflow.yaml` supports an optional `model` field (e.g., `model: 
 
 ### Per-Loop Claude CLI Arguments
 Each loop in `ralphflow.yaml` supports optional `claude_args` (string array of additional CLI flags, e.g., `["--chrome"]`) and `skip_permissions` (boolean, defaults to `true`). Both `LoopConfig` and `TemplateLoopDefinition` include these fields. `createCustomTemplate()` writes them to YAML only when provided (no empty arrays). Omitting both fields preserves backward compatibility — existing configs parse and work unchanged.
+
+### Server-Side Prompt Generation (core/prompt-generator.ts)
+`generatePromptFromConfig(loop, loopIndex, allLoops)` generates structured agent prompts server-side, ported from the client-side `ui/prompt-builder.js` engine. Takes a `PromptLoopConfig` (name, stages, completion, multi_agent, entities, inputFiles, outputFiles, stageConfigs) and produces a complete markdown prompt with identity header, pipeline reference, state machine, stage instructions, and rules. For multi-agent loops, includes tracker lock protocol, item selection algorithm, anti-hijacking rules, heartbeat protocol, crash recovery, and first-run handling — all entity-aware (e.g., "topic" → Topics Queue, `completed_topics`). `buildPromptLoopConfig(loopDef)` converts a `TemplateLoopDefinition` to a `PromptLoopConfig` with sensible default stage capabilities (first stage: explore/read, middle: code/bash, last: verify/bash). Used by the `create-template` CLI command for auto-prompt generation.
+
+### Create-Template CLI Command (cli/create-template.ts)
+`ralphflow create-template --config '<json>' | --config-file <path>` creates a custom template from a `TemplateDefinition` JSON. For each loop without explicit `prompt` content, auto-generates a full structured prompt via `generatePromptFromConfig()`. Validates required fields (name, loops, stages, completion), calls `createCustomTemplate()`, and outputs the created path with next-steps guidance. Supports `claude_args` and `skip_permissions` per loop. Errors on duplicate names, invalid JSON, or missing fields.
 
 ### Pipeline Progress Calculation
 `calculatePipelineProgress(loops)` in `ui/index.html` computes weighted aggregate progress across loops. Returns `{ perLoop: [{key, completed, total, fraction}], completed, total, percentage }`. Loops with 0 total items are excluded from the denominator. Used by pipeline node rendering (TASK-4) and sidebar progress bars (TASK-6).
