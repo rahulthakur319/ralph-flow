@@ -937,6 +937,118 @@
   }
   .notif-dismiss:hover { color: var(--red); }
 
+  /* Decision section in interactive panel */
+  .interactive-section-header {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    padding: 8px 10px 4px;
+  }
+  .decision-group {
+    margin-bottom: 4px;
+  }
+  .decision-group-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: var(--radius);
+    user-select: none;
+  }
+  .decision-group-header:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+  .decision-group-header .group-chevron {
+    font-size: 9px;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+  .decision-group-header .group-chevron.expanded {
+    transform: rotate(90deg);
+  }
+  .decision-group-header .group-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .decision-group-header .group-count {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 1px 5px;
+    border-radius: 8px;
+    background: var(--purple);
+    color: #000;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .decision-group-body {
+    padding-left: 12px;
+  }
+  .decision-group-body.collapsed {
+    display: none;
+  }
+  .decision-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 7px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--purple);
+    border-radius: var(--radius);
+    margin-bottom: 4px;
+    font-size: 12px;
+  }
+  .decision-card:last-child { margin-bottom: 0; }
+  .decision-card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .decision-card-top .decision-time {
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .decision-card-top .decision-agent {
+    color: var(--purple);
+    font-family: var(--mono);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .decision-card-top .decision-dismiss {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .decision-card-top .decision-dismiss:hover { color: var(--red); }
+  .decision-summary {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 12px;
+  }
+  .decision-reasoning {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-style: italic;
+  }
+
   /* Sidebar notification badge */
   .notif-badge {
     font-size: 10px;
@@ -945,6 +1057,16 @@
     border-radius: 10px;
     margin-left: 6px;
     background: var(--accent);
+    color: #000;
+    font-weight: 600;
+  }
+  .decision-badge {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+    background: var(--purple);
     color: #000;
     font-weight: 600;
   }
@@ -1724,6 +1846,7 @@
   let promptViewMode = 'read';
   let cachedPromptValue = null;
   let notificationsList = [];
+  let decisionsList = [];
   let notifPermissionRequested = false;
   let audioCtx = null;
   let audioCtxInitialized = false;
@@ -1831,6 +1954,18 @@
       notificationsList = notificationsList.filter(n => n.id !== event.id);
       renderSidebar();
       renderContent();
+    } else if (event.type === 'decision:reported') {
+      const d = event.decision;
+      decisionsList.unshift(d);
+      renderSidebar();
+      renderContent();
+      maybeRequestNotifPermission();
+      showBrowserDecisionNotification(d);
+      playNotificationChime();
+    } else if (event.type === 'decision:dismissed') {
+      decisionsList = decisionsList.filter(d => d.id !== event.id);
+      renderSidebar();
+      renderContent();
     }
   }
 
@@ -1877,9 +2012,11 @@
         for (const loop of app.loops) {
           const loopActive = appActive && selectedLoop === loop.key;
           const loopNotifCount = notificationsList.filter(n => n.app === app.appName && n.loop === loop.key).length;
-          const badgeHtml = loopNotifCount > 0 ? ` <span class="notif-badge">${loopNotifCount}</span>` : '';
+          const loopDecisionCount = decisionsList.filter(d => d.app === app.appName && d.loop === loop.key).length;
+          const notifBadge = loopNotifCount > 0 ? ` <span class="notif-badge">${loopNotifCount}</span>` : '';
+          const decisionBadge = loopDecisionCount > 0 ? ` <span class="decision-badge">${loopDecisionCount}</span>` : '';
           html += `<div class="sidebar-item loop-item${loopActive ? ' active' : ''}" data-app="${esc(app.appName)}" data-loop="${esc(loop.key)}">
-            ${esc(loop.name)}${badgeHtml}
+            ${esc(loop.name)}${notifBadge}${decisionBadge}
           </div>`;
         }
       }
@@ -2059,24 +2196,39 @@
       // Left column: Interactive + Progress
       html += '<div class="panel-col-left">';
 
-      // Interactive panel
+      // Interactive panel — Notifications + Decisions
       const loopNotifs = notificationsList.filter(n => n.app === app.appName && n.loop === currentLoop.key);
+      const loopDecisions = decisionsList.filter(d => d.app === app.appName && d.loop === currentLoop.key);
       const hasNotifs = loopNotifs.length > 0;
-      html += `<div class="panel panel-interactive${hasNotifs ? ' has-notifs' : ''}">
-        <div class="panel-header">Interactive${hasNotifs ? ' <span style="color:var(--accent)">(' + loopNotifs.length + ')</span>' : ''}</div>
+      const hasDecisions = loopDecisions.length > 0;
+      const interactiveTotal = loopNotifs.length + loopDecisions.length;
+      const hasInteractive = hasNotifs || hasDecisions;
+      html += `<div class="panel panel-interactive${hasInteractive ? ' has-notifs' : ''}">
+        <div class="panel-header">Interactive${interactiveTotal > 0 ? ' <span style="color:var(--accent)">(' + interactiveTotal + ')</span>' : ''}</div>
         <div class="panel-body">`;
-      if (hasNotifs) {
-        for (const n of loopNotifs) {
-          const time = new Date(n.timestamp).toLocaleTimeString();
-          const msg = extractNotifMessage(n.payload);
-          html += `<div class="notif-card" data-notif-id="${esc(n.id)}">
-            <span class="notif-time">${esc(time)}</span>
-            <span class="notif-msg">${esc(msg)}</span>
-            <button class="notif-dismiss" data-dismiss-id="${esc(n.id)}">&times;</button>
-          </div>`;
-        }
+
+      if (!hasInteractive) {
+        html += `<span class="bell-icon">&#128276;</span><span>No notifications or decisions</span>`;
       } else {
-        html += `<span class="bell-icon">&#128276;</span><span>No notifications</span>`;
+        // Notifications section
+        if (hasNotifs) {
+          html += '<div class="interactive-section-header">Notifications</div>';
+          for (const n of loopNotifs) {
+            const time = new Date(n.timestamp).toLocaleTimeString();
+            const msg = extractNotifMessage(n.payload);
+            html += `<div class="notif-card" data-notif-id="${esc(n.id)}">
+              <span class="notif-time">${esc(time)}</span>
+              <span class="notif-msg">${esc(msg)}</span>
+              <button class="notif-dismiss" data-dismiss-id="${esc(n.id)}">&times;</button>
+            </div>`;
+          }
+        }
+
+        // Decisions section with nested grouping
+        if (hasDecisions) {
+          html += '<div class="interactive-section-header">Decisions</div>';
+          html += renderDecisionGroups(loopDecisions);
+        }
       }
       html += '</div></div>';
 
@@ -2163,6 +2315,24 @@
     // Bind notification dismiss buttons
     content.querySelectorAll('.notif-dismiss').forEach(btn => {
       btn.addEventListener('click', () => dismissNotification(btn.dataset.dismissId));
+    });
+
+    // Bind decision dismiss buttons
+    content.querySelectorAll('.decision-dismiss').forEach(btn => {
+      btn.addEventListener('click', () => dismissDecision(btn.dataset.dismissDecisionId));
+    });
+
+    // Bind decision group collapse/expand
+    content.querySelectorAll('.decision-group-header').forEach(hdr => {
+      hdr.addEventListener('click', () => {
+        const groupId = hdr.dataset.decisionGroup;
+        const body = document.getElementById(groupId);
+        const chevron = hdr.querySelector('.group-chevron');
+        if (body && chevron) {
+          body.classList.toggle('collapsed');
+          chevron.classList.toggle('expanded');
+        }
+      });
     });
 
     // Bind edit tabs + load content
@@ -2623,6 +2793,71 @@
     new Notification('RalphFlow — ' + (n.loop || 'Notification'), { body: msg });
   }
 
+  // Decisions
+  async function fetchDecisions() {
+    try {
+      const data = await fetchJson('/api/decisions');
+      decisionsList = Array.isArray(data) ? data : [];
+      renderSidebar();
+      renderContent();
+    } catch { /* ignore */ }
+  }
+
+  async function dismissDecision(id) {
+    try {
+      await fetch(`/api/decision/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      decisionsList = decisionsList.filter(d => d.id !== id);
+      renderSidebar();
+      renderContent();
+    } catch { /* ignore */ }
+  }
+
+  function showBrowserDecisionNotification(d) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (document.hasFocus()) return;
+    new Notification('RalphFlow — Decision: ' + (d.item || d.loop), {
+      body: d.decision + (d.reasoning ? ' — ' + d.reasoning : ''),
+    });
+  }
+
+  function renderDecisionGroups(decisions) {
+    // Group by item (STORY-N, TASK-N)
+    const byItem = {};
+    for (const d of decisions) {
+      const key = d.item || 'Other';
+      if (!byItem[key]) byItem[key] = [];
+      byItem[key].push(d);
+    }
+
+    let html = '';
+    for (const [item, itemDecisions] of Object.entries(byItem)) {
+      const groupId = 'dg-' + item.replace(/[^a-zA-Z0-9-]/g, '_');
+      html += `<div class="decision-group">
+        <div class="decision-group-header" data-decision-group="${esc(groupId)}">
+          <span class="group-chevron expanded">&#9654;</span>
+          <span class="group-label">${esc(item)}</span>
+          <span class="group-count">${itemDecisions.length}</span>
+        </div>
+        <div class="decision-group-body" id="${esc(groupId)}">`;
+
+      for (const d of itemDecisions) {
+        const time = new Date(d.timestamp).toLocaleTimeString();
+        html += `<div class="decision-card" data-decision-id="${esc(d.id)}">
+          <div class="decision-card-top">
+            <span class="decision-time">${esc(time)}</span>
+            <span class="decision-agent">${esc(d.agent)}</span>
+            <button class="decision-dismiss" data-dismiss-decision-id="${esc(d.id)}">&times;</button>
+          </div>
+          <div class="decision-summary">${esc(d.decision)}</div>
+          ${d.reasoning ? '<div class="decision-reasoning">' + esc(d.reasoning) + '</div>' : ''}
+        </div>`;
+      }
+      html += '</div></div>';
+    }
+    return html;
+  }
+
   // Audio notification chime (Web Audio API)
   function initAudioContext() {
     if (audioCtxInitialized) return;
@@ -2909,6 +3144,7 @@
 
       // Clean up client state
       notificationsList = notificationsList.filter(n => n.app !== appName);
+      decisionsList = decisionsList.filter(d => d.app !== appName);
       if (selectedApp && selectedApp.appName === appName) {
         selectedApp = null;
         selectedLoop = null;
@@ -3005,6 +3241,7 @@
 
       // Clean up client state and refresh
       notificationsList = notificationsList.filter(n => n.app !== appName);
+      decisionsList = decisionsList.filter(d => d.app !== appName);
       fetchApps();
     } catch (err) {
       msgEl.innerHTML = '<div class="form-error">Network error — could not reach server</div>';
@@ -4818,6 +5055,7 @@ Before ANY write to \`tracker.md\`, you MUST acquire the lock:
 
   fetchApps();
   fetchNotifications();
+  fetchDecisions();
   connectWs();
 })();
 </script>
