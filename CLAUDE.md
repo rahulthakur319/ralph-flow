@@ -124,6 +124,9 @@ Connectors between pipeline nodes turn green (`var(--green)`) when the left-adja
 ### Pipeline I/O File Display
 The `/api/apps` endpoint includes `feeds` (output files) and `fed_by` (input files) arrays for each loop. Pipeline nodes render I/O file names as compact monospace labels: input files (blue, `.node-io-in`) appear above the node name, output files (green, `.node-io-out`) appear below the progress bar. When a loop's `feeds` overlap with the next loop's `fed_by`, the connector wraps in a `.pipeline-connector-wrap` and shows the shared file name below the line (`.connector-file`). Nodes with no I/O files show no labels (graceful degradation). Labels use `8px` font to stay visually subordinate to the `12px` node name.
 
+### Builder Minimap I/O File Display
+Template builder minimap nodes show I/O file names from the builder state. Input files appear above the loop name with a `→` prefix (`.minimap-io-in`), output files below the index with a `→` suffix (`.minimap-io-out`). When adjacent loops share a file (loop N output = loop N+1 input), the connector between them shows the shared file name (`.builder-minimap-connector-file`, accent colored). Connectors use a flex-column layout with `.builder-minimap-connector-line` for the line and optional file label above. `updateMinimapIO()` live-updates labels when I/O fields change in the structured prompt form. Multiple files show the first name with a `+N` suffix; tooltips show all files. Labels use `9px` font and `max-width: 80px` with ellipsis to stay subordinate to node names.
+
 ### Multi-Agent Coordination
 - PID-based lock files in `.agents/` directory next to tracker
 - `acquireAgentId()` claims `agent-N.lock`, `releaseAgentId()` removes on exit
