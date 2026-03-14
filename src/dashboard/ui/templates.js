@@ -193,6 +193,14 @@ export function renderTemplateBuilder() {
       <input class="form-input loop-input" data-loop-idx="${si}" data-field="completion" type="text" value="${esc(loop.completion)}" placeholder="LOOP COMPLETE" autocomplete="off">
       <div class="form-field-note">When this string appears in the tracker, the process is automatically stopped via <code>kill -INT $PPID</code></div></div>`;
 
+    // Claude CLI Args
+    html += `<div class="form-group loop-card-full"><label class="form-label">Claude CLI Args <span class="form-hint">Extra flags passed to Claude (comma-separated)</span></label>
+      <input class="form-input loop-input" data-loop-idx="${si}" data-field="claudeArgs" type="text" value="${esc(loop.claudeArgs || '')}" placeholder="e.g. --chrome, --verbose" autocomplete="off"></div>`;
+
+    // Skip Permissions toggle
+    html += `<div class="form-group"><label class="form-label">Skip Permissions <span class="form-hint">Add --dangerously-skip-permissions</span></label>
+      <div class="toggle-wrap"><input class="toggle-input loop-toggle" data-loop-idx="${si}" data-field="skipPermissions" type="checkbox" ${loop.skipPermissions !== false ? 'checked' : ''}><span class="toggle-label">${loop.skipPermissions !== false ? 'On' : 'Off'}</span></div></div>`;
+
     html += '</div>'; // close loop-card-grid
 
     // Stages section — each stage gets its own card
@@ -339,6 +347,20 @@ function bindTemplateBuilderEvents() {
         loop._inputAutoFilled = false;
         updateMinimapIO();
       }
+      updateYamlPreview();
+    });
+  });
+
+  // Toggle inputs (checkboxes like skipPermissions)
+  dom.content.querySelectorAll('.loop-toggle').forEach(input => {
+    input.addEventListener('change', () => {
+      const idx = parseInt(input.dataset.loopIdx);
+      const field = input.dataset.field;
+      const loop = state.templateBuilderState.loops[idx];
+      if (!loop) return;
+      loop[field] = input.checked;
+      const text = input.parentElement.querySelector('.toggle-label');
+      if (text) text.textContent = input.checked ? 'On' : 'Off';
       updateYamlPreview();
     });
   });
@@ -550,6 +572,14 @@ export function captureBuilderInputs() {
     const loop = tbs.loops[idx];
     if (!loop) return;
     loop[field] = input.value;
+  });
+
+  // Capture toggle inputs (checkboxes)
+  dom.content.querySelectorAll('.loop-toggle').forEach(input => {
+    const idx = parseInt(input.dataset.loopIdx);
+    const field = input.dataset.field;
+    const loop = tbs.loops[idx];
+    if (loop) loop[field] = input.checked;
   });
 
   // Capture stage card inputs
