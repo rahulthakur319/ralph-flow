@@ -1434,6 +1434,7 @@
   let templatesList = [];
   let showTemplateBuilder = false;
   let templateBuilderState = null;
+  let editingTemplateName = null;
 
   // DOM refs
   const $ = (sel) => document.querySelector(sel);
@@ -2936,7 +2937,7 @@
           ${tpl.description ? `<div class="template-card-desc">${esc(tpl.description)}</div>` : ''}
           <div class="template-card-meta">
             <span>${tpl.loopCount} loop${tpl.loopCount !== 1 ? 's' : ''}</span>
-            ${tpl.type === 'custom' ? `<button class="btn btn-danger" style="font-size:11px;padding:2px 8px" data-delete-template="${esc(tpl.name)}">Delete</button>` : `<button class="btn" style="font-size:11px;padding:2px 8px" data-clone-template="${esc(tpl.name)}">Clone</button>`}
+            ${tpl.type === 'custom' ? `<button class="btn" style="font-size:11px;padding:2px 8px" data-edit-template="${esc(tpl.name)}">Edit</button><button class="btn btn-danger" style="font-size:11px;padding:2px 8px;margin-left:4px" data-delete-template="${esc(tpl.name)}">Delete</button>` : `<button class="btn" style="font-size:11px;padding:2px 8px" data-clone-template="${esc(tpl.name)}">Clone</button>`}
           </div>
         </div>`;
       }
@@ -2949,10 +2950,15 @@
     if (createBtn) {
       createBtn.addEventListener('click', () => {
         showTemplateBuilder = true;
+        editingTemplateName = null;
         templateBuilderState = initTemplateBuilderState();
         renderTemplatesPage();
       });
     }
+
+    content.querySelectorAll('[data-edit-template]').forEach(btn => {
+      btn.addEventListener('click', () => loadTemplateForEdit(btn.dataset.editTemplate));
+    });
 
     content.querySelectorAll('[data-delete-template]').forEach(btn => {
       btn.addEventListener('click', () => openDeleteTemplateModal(btn.dataset.deleteTemplate));
@@ -2968,7 +2974,7 @@
     let html = '';
 
     html += '<div class="templates-header">';
-    html += '<div style="display:flex;align-items:center;gap:12px"><button class="btn btn-muted" id="builderBackBtn" style="padding:4px 10px">&larr; Back</button><h2>Create Template</h2></div>';
+    html += `<div style="display:flex;align-items:center;gap:12px"><button class="btn btn-muted" id="builderBackBtn" style="padding:4px 10px">&larr; Back</button><h2>${editingTemplateName ? 'Edit Template' : 'Create Template'}</h2></div>`;
     html += '</div>';
 
     html += '<div class="template-builder">';
@@ -3106,7 +3112,7 @@
     // Actions
     html += '<div class="builder-actions">';
     html += '<button class="btn" id="builderCancelBtn">Cancel</button>';
-    html += '<button class="btn btn-primary" id="builderSaveBtn">Save Template</button>';
+    html += `<button class="btn btn-primary" id="builderSaveBtn">${editingTemplateName ? 'Update Template' : 'Save Template'}</button>`;
     html += '</div>';
 
     html += '</div>'; // close template-builder
@@ -3120,6 +3126,7 @@
     if (backBtn) backBtn.addEventListener('click', () => {
       showTemplateBuilder = false;
       templateBuilderState = null;
+      editingTemplateName = null;
       renderTemplatesPage();
     });
 
@@ -3127,6 +3134,7 @@
     if (cancelBtn) cancelBtn.addEventListener('click', () => {
       showTemplateBuilder = false;
       templateBuilderState = null;
+      editingTemplateName = null;
       renderTemplatesPage();
     });
 
@@ -3484,12 +3492,24 @@
     };
 
     const saveBtn = document.getElementById('builderSaveBtn');
+    const saveBtnLabel = editingTemplateName ? 'Update Template' : 'Save Template';
     if (saveBtn) {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
     }
 
     try {
+      // In edit mode, delete the old template first
+      if (editingTemplateName) {
+        const delRes = await fetch('/api/templates/' + encodeURIComponent(editingTemplateName), { method: 'DELETE' });
+        if (!delRes.ok) {
+          const delData = await delRes.json();
+          alert(delData.error || 'Failed to update template');
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtnLabel; }
+          return;
+        }
+      }
+
       const res = await fetch('/api/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3499,23 +3519,78 @@
 
       if (!res.ok) {
         alert(data.error || 'Failed to save template');
-        if (saveBtn) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = 'Save Template';
-        }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtnLabel; }
         return;
       }
 
       showTemplateBuilder = false;
       templateBuilderState = null;
+      editingTemplateName = null;
       templatesList = [];
       renderTemplatesPage();
     } catch {
       alert('Network error — could not reach server');
-      if (saveBtn) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save Template';
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtnLabel; }
+    }
+  }
+
+  async function loadTemplateForEdit(templateName) {
+    try {
+      const configRes = await fetch('/api/templates/' + encodeURIComponent(templateName) + '/config');
+      if (!configRes.ok) {
+        alert('Failed to load template config');
+        return;
       }
+      const config = await configRes.json();
+
+      // Convert config loops to builder state
+      const sortedLoops = Object.entries(config.loops)
+        .sort(([, a], [, b]) => a.order - b.order);
+
+      const loops = [];
+      for (const [loopKey, loop] of sortedLoops) {
+        const isMultiAgent = loop.multi_agent && typeof loop.multi_agent === 'object' && loop.multi_agent.enabled;
+        // Strip directory prefix from data_files (e.g. "00-story-loop/stories.md" → "stories.md")
+        const dataFiles = (loop.data_files || []).map(f => f.includes('/') ? f.split('/').pop() : f);
+
+        const loopState = {
+          name: loop.name || '',
+          model: loop.model || 'claude-sonnet-4-6',
+          stages: loop.stages || [],
+          completion: loop.completion || '',
+          multi_agent: !!isMultiAgent,
+          max_agents: isMultiAgent ? loop.multi_agent.max_agents : 3,
+          strategy: isMultiAgent ? loop.multi_agent.strategy : 'parallel',
+          agent_placeholder: isMultiAgent ? loop.multi_agent.agent_placeholder : '{{AGENT_NAME}}',
+          data_files: dataFiles,
+          entities: loop.entities || [],
+          showOptional: dataFiles.length > 0 || (loop.entities && loop.entities.length > 0),
+          showPrompt: false,
+          prompt: ''
+        };
+
+        // Load prompt content
+        try {
+          const promptRes = await fetch('/api/templates/' + encodeURIComponent(templateName) + '/loops/' + encodeURIComponent(loopKey) + '/prompt');
+          if (promptRes.ok) {
+            const promptData = await promptRes.json();
+            loopState.prompt = promptData.content || '';
+          }
+        } catch { /* prompt load is best-effort */ }
+
+        loops.push(loopState);
+      }
+
+      editingTemplateName = templateName;
+      showTemplateBuilder = true;
+      templateBuilderState = {
+        name: config.name || templateName,
+        description: config.description || '',
+        loops: loops.length > 0 ? loops : [createEmptyLoop()]
+      };
+      renderTemplatesPage();
+    } catch {
+      alert('Failed to load template for editing');
     }
   }
 
@@ -3690,6 +3765,7 @@
     selectedLoop = null;
     showTemplateBuilder = false;
     templateBuilderState = null;
+    editingTemplateName = null;
     document.title = 'Templates - RalphFlow Dashboard';
     renderSidebar();
     renderContent();
