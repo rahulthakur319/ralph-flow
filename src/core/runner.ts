@@ -222,6 +222,8 @@ async function iterationLoop(
         RALPHFLOW_APP: appName,
         RALPHFLOW_LOOP: configKey,
       },
+      claudeArgs: loop.claude_args,
+      skipPermissions: loop.skip_permissions,
     });
 
     // After Claude returns: update DB iteration count
