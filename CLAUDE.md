@@ -121,6 +121,9 @@ Each pipeline node shows a completion ratio (e.g., "3/7") and a 4px green progre
 ### Pipeline Connector Coloring
 Connectors between pipeline nodes turn green (`var(--green)`) when the left-adjacent loop is complete (`getLoopStatusClass() === 'complete'`). This creates a visual "flow" of green from left to right through completed loops. A CSS transition (0.3s) smooths color changes. The `.pipeline-connector.complete` class is toggled during pipeline rendering based on the previous loop's status.
 
+### Pipeline I/O File Display
+The `/api/apps` endpoint includes `feeds` (output files) and `fed_by` (input files) arrays for each loop. Pipeline nodes render I/O file names as compact monospace labels: input files (blue, `.node-io-in`) appear above the node name, output files (green, `.node-io-out`) appear below the progress bar. When a loop's `feeds` overlap with the next loop's `fed_by`, the connector wraps in a `.pipeline-connector-wrap` and shows the shared file name below the line (`.connector-file`). Nodes with no I/O files show no labels (graceful degradation). Labels use `8px` font to stay visually subordinate to the `12px` node name.
+
 ### Multi-Agent Coordination
 - PID-based lock files in `.agents/` directory next to tracker
 - `acquireAgentId()` claims `agent-N.lock`, `releaseAgentId()` removes on exit
