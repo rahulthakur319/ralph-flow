@@ -30,8 +30,17 @@ src/
 │   ├── hooks.ts              — Claude Code Notification hook management for .claude/settings.local.json
 │   ├── watcher.ts            — Chokidar file watcher → WebSocket broadcast, DB polling every 2s
 │   └── ui/
-│       ├── index.html        — HTML structure + inline JS (dark theme, no build step)
-│       └── styles.css        — Extracted CSS stylesheet (all dashboard styles)
+│       ├── index.html        — HTML structure only (dark theme, no build step)
+│       ├── styles.css        — Extracted CSS stylesheet (all dashboard styles)
+│       ├── app.js            — Entry point: WebSocket, data fetching, init, action wiring
+│       ├── state.js          — Shared mutable state, DOM refs, cross-module actions registry
+│       ├── utils.js          — Pure utilities: esc, fetchJson, renderMarkdown, progress calc
+│       ├── sidebar.js        — Sidebar rendering, app/loop selection
+│       ├── loop-detail.js    — Main content render, edit panel, app modals (create/delete/archive)
+│       ├── notifications.js  — Notification/decision handling, audio chimes, browser notifications
+│       ├── archives.js       — Archive browsing: listing, file tree, file viewer
+│       ├── templates.js      — Template listing, builder UI, YAML preview, save/load/delete/clone
+│       └── prompt-builder.js — Prompt config form, generation engine, block-based builder
 └── templates/
     ├── claude-md.template.md — CLAUDE.md template with {{VAR}} substitution
     ├── code-implementation/  — Story → Tasks → Delivery (3 loops, multi-agent on tasks)
@@ -149,7 +158,10 @@ Template builder minimap nodes show I/O file names from the builder state. Input
 ```
 
 ### Static File Serving (dashboard/server.ts)
-`resolveUiDir()` locates the `ui/` directory using dev/bundled dual-path resolution. The server serves `index.html` at `/` and static `.css`/`.js` files via a pattern-matched route (`/:file{.+\\.(css|js)$}`). Path traversal is guarded by checking `filePath.startsWith(uiDir)`. Content types are mapped via the `CONTENT_TYPES` constant. This enables the CSS extraction (`styles.css`) and future JS module extraction without a build step.
+`resolveUiDir()` locates the `ui/` directory using dev/bundled dual-path resolution. The server serves `index.html` at `/` and static `.css`/`.js` files via a pattern-matched route (`/:file{.+\\.(css|js)$}`). Path traversal is guarded by checking `filePath.startsWith(uiDir)`. Content types are mapped via the `CONTENT_TYPES` constant. This enables the CSS extraction (`styles.css`) and JS module serving without a build step.
+
+### Dashboard JS Module Architecture (ui/*.js)
+The dashboard frontend is split into 9 ES module files loaded via `<script type="module" src="app.js">`. `index.html` contains only HTML structure. The module dependency graph is acyclic: `state.js` and `utils.js` are leaf modules with no imports; `notifications.js`, `sidebar.js`, `archives.js` import only from state/utils; `loop-detail.js` additionally imports from notifications/archives; `prompt-builder.js` imports from state/utils; `templates.js` imports from state/utils/prompt-builder; `app.js` imports from all modules and wires the `actions` registry. Cross-module function calls (e.g., `renderSidebar()` from notifications) use an actions registry pattern: `state.js` exports a mutable `actions` object, `app.js` populates it with function references at init, and modules call `actions.functionName()` instead of importing directly. This avoids circular dependencies. `window.openDeleteAppModal` and `window.openArchiveAppModal` remain global for inline onclick handlers in generated HTML.
 
 ### Claude Hooks Management (dashboard/hooks.ts)
 `installNotificationHook(cwd, port)` writes a Notification hook to `.claude/settings.local.json` that pipes Claude's attention events to the dashboard via `curl POST`. `removeNotificationHook(cwd)` removes only the RalphFlow-managed entry (identified by `# ralphflow-managed` marker comment), preserving user hooks. Both functions handle missing dirs, missing files, and malformed JSON gracefully.
