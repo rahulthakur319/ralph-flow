@@ -63,7 +63,7 @@ function broadcastWs(wss: WebSocketServer | undefined, event: unknown): void {
   }
 }
 
-export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocketServer): Hono {
+export function createApiRoutes(cwd: string, portRef: { value: number }, wss?: WebSocketServer): Hono {
   const api = new Hono();
 
   // GET /api/context — working directory info
@@ -71,7 +71,7 @@ export function createApiRoutes(cwd: string, port: number = 4242, wss?: WebSocke
     return c.json({
       cwd,
       projectName: basename(cwd),
-      port,
+      port: portRef.value,
     });
   });
 
