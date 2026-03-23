@@ -14,7 +14,8 @@ src/
 │   ├── e2e.ts                — `e2e` command: orchestrated all-loops execution with SQLite, --ui flag
 │   ├── status.ts             — `status` command: renders loop status table
 │   ├── dashboard.ts          — `dashboard` command (alias: `ui`): starts web server
-│   └── create-template.ts    — `create-template` command: create custom template from JSON definition
+│   ├── create-template.ts    — `create-template` command: create custom template from JSON definition
+│   └── summarize.ts          — `summarize` command: spawn Claude on archive to generate summary.md
 ├── core/
 │   ├── index.ts              — Public API re-exports
 │   ├── types.ts              — All TypeScript interfaces (RalphFlowConfig, LoopConfig, TrackerStatus, etc.)
@@ -106,9 +107,11 @@ ralphflow
 │   └── -f, --flow
 ├── dashboard (alias: ui)  → start web dashboard
 │   └── -p, --port         (default 4242)
-└── create-template        → create custom template from JSON
-    ├── --config <json>    inline JSON template definition
-    └── --config-file <path> path to JSON file
+├── create-template        → create custom template from JSON
+│   ├── --config <json>    inline JSON template definition
+│   └── --config-file <path> path to JSON file
+└── summarize <app> <date> → generate summary of an archived run
+    └── -m, --model        Claude model
 ```
 
 ## Key Patterns
@@ -237,6 +240,9 @@ The structured prompt form's Input/Output file fields map to `fed_by`/`feeds` in
 
 ### Archive Viewer UI (ui/index.html)
 The app detail view has a "Loops" / "Archives" tab bar below the app header. The "Loops" tab shows the existing pipeline, commands, and three-panel loop layout. The "Archives" tab fetches snapshots from `GET /api/apps/:app/archives` and renders them as expandable timeline cards (newest-first) showing date, story count, task count, and file count. Clicking a card loads its file listing; clicking a file displays its content inline in a read-only monospace viewer. Empty state shown when no archives exist. Tab selection (`activeAppTab`) persists when switching loops within the same app; resets to "Loops" on app change.
+
+### Summarize CLI Command (cli/summarize.ts)
+`ralphflow summarize <app> <archive-date>` spawns an interactive Claude session pointed at an archive directory (`.ralph-flow/.archives/<app>/<archive-date>/`). Claude reads all `.md` files and writes a `summary.md` with stats, ASCII tree diagram, story narratives, and key decisions. Validates the archive exists with helpful error messages listing available archives on invalid input. Supports `--model` flag. Uses `spawnClaude()` with the archive dir as cwd.
 
 ### Decision Reporting Protocol (built-in prompts)
 All 7 built-in template prompts include a "Decision Reporting Protocol" section instructing agents to report substantive decisions (scope boundaries, approach choices, trade-off resolutions, ambiguity interpretations) to the dashboard via `curl -s --connect-timeout 2 --max-time 5 -X POST "http://127.0.0.1:4242/api/decision?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP"` with JSON body `{item, agent, decision, reasoning}`. Routine operations (claiming tasks, heartbeats, stage transitions) are explicitly excluded. Reporting is best-effort — agents continue normally if the dashboard is unreachable. Multi-agent loops use `{{AGENT_NAME}}` for the agent field; single-agent loops use the loop name.
