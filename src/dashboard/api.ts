@@ -245,31 +245,57 @@ export function createApiRoutes(cwd: string, portRef: { value: number }, wss?: W
       mkdirSync(archiveDir, { recursive: true });
       cpSync(flowDir, archiveDir, { recursive: true });
 
-      // Step 2: Reset tracker and data files using template originals
+      // Step 2: Reset tracker, data files, and directories
       let templateDir: string | undefined;
+      let usedFallbackReset = false;
       try {
         templateDir = resolveTemplatePathWithCustom(config.name, cwd);
       } catch {
-        // Template not found — skip template-based reset
+        usedFallbackReset = true;
+        console.warn(`[archive] Template "${config.name}" not found — using fallback reset`);
       }
 
-      for (const loop of Object.values(config.loops)) {
+      for (const [loopKey, loop] of Object.entries(config.loops)) {
         // Reset tracker file
+        const appTracker = join(flowDir, loop.tracker);
         if (templateDir) {
           const templateTracker = join(templateDir, 'loops', loop.tracker);
-          const appTracker = join(flowDir, loop.tracker);
           if (existsSync(templateTracker)) {
             writeFileSync(appTracker, readFileSync(templateTracker, 'utf-8'));
           }
+        } else if (existsSync(appTracker)) {
+          // Fallback: reset tracker to minimal empty state
+          const title = loop.name || loopKey;
+          writeFileSync(appTracker, `# ${title} — Tracker\n\n- stage: idle\n`);
         }
 
         // Reset data files
-        if (loop.data_files && templateDir) {
+        if (loop.data_files) {
           for (const dataFile of loop.data_files) {
-            const templateData = join(templateDir, 'loops', dataFile);
             const appData = join(flowDir, dataFile);
-            if (existsSync(templateData)) {
-              writeFileSync(appData, readFileSync(templateData, 'utf-8'));
+            if (templateDir) {
+              const templateData = join(templateDir, 'loops', dataFile);
+              if (existsSync(templateData)) {
+                writeFileSync(appData, readFileSync(templateData, 'utf-8'));
+              }
+            } else if (existsSync(appData)) {
+              // Fallback: reset data file to header-only
+              const fileName = basename(dataFile, '.md');
+              const header = fileName.charAt(0).toUpperCase() + fileName.slice(1);
+              writeFileSync(appData, `# ${header}\n`);
+            }
+          }
+        }
+
+        // Empty configured directories (preserve dir, remove contents)
+        if (loop.directories) {
+          for (const dir of loop.directories) {
+            const dirPath = join(flowDir, dir);
+            if (existsSync(dirPath)) {
+              for (const entry of readdirSync(dirPath)) {
+                const entryPath = join(dirPath, entry);
+                rmSync(entryPath, { recursive: true, force: true });
+              }
             }
           }
         }
@@ -311,7 +337,11 @@ export function createApiRoutes(cwd: string, portRef: { value: number }, wss?: W
       }
 
       const archivePath = `.ralph-flow/.archives/${appName}/${archiveTimestamp}`;
-      return c.json({ ok: true, archivePath, timestamp: archiveTimestamp });
+      const result: Record<string, unknown> = { ok: true, archivePath, timestamp: archiveTimestamp };
+      if (usedFallbackReset) {
+        result.warning = `Template "${config.name}" not found — reset used fallback (minimal empty content)`;
+      }
+      return c.json(result);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return c.json({ error: `Archive failed: ${msg}` }, 500);
