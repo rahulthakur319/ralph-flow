@@ -1228,6 +1228,28 @@ body {
 .archive-summary .md-code-block code {
   font-family: var(--mono);
 }
+.archive-summary-hint {
+  border-top: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.archive-summary-hint-text {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.archive-summary-hint-cmd {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px 8px;
+  user-select: all;
+}
 
 /* Archive file browser */
 .archive-files {

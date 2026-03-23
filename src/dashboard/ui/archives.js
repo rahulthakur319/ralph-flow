@@ -53,10 +53,15 @@ function renderArchivesView(container, appName) {
     if (isExpanded) {
       const files = state.archiveFilesCache[archive.timestamp];
       if (files) {
-        // Show summary.md prominently at top if available
+        // Show summary.md prominently at top if available, otherwise show CLI hint
         const summaryContent = state.archiveSummaryCache[archive.timestamp];
         if (summaryContent) {
           html += `<div class="archive-summary">${renderMarkdown(summaryContent)}</div>`;
+        } else {
+          html += `<div class="archive-summary-hint">
+            <span class="archive-summary-hint-text">No summary yet. Generate one with:</span>
+            <code class="archive-summary-hint-cmd">npx ralphflow summarize ${esc(appName)} ${esc(archive.timestamp)}</code>
+          </div>`;
         }
 
         // Filter summary.md from regular file list
