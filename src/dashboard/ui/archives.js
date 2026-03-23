@@ -1,13 +1,14 @@
 // Archive browsing: listing, file tree, file viewer.
 
 import { state, actions } from './state.js';
-import { fetchJson, esc } from './utils.js';
+import { fetchJson, esc, renderMarkdown } from './utils.js';
 
 export function switchAppTab(tab) {
   if (tab === state.activeAppTab) return;
   state.activeAppTab = tab;
   state.expandedArchive = null;
   state.archiveFilesCache = {};
+  state.archiveSummaryCache = {};
   state.viewingArchiveFile = null;
   actions.renderContent();
 }
@@ -52,8 +53,16 @@ function renderArchivesView(container, appName) {
     if (isExpanded) {
       const files = state.archiveFilesCache[archive.timestamp];
       if (files) {
+        // Show summary.md prominently at top if available
+        const summaryContent = state.archiveSummaryCache[archive.timestamp];
+        if (summaryContent) {
+          html += `<div class="archive-summary">${renderMarkdown(summaryContent)}</div>`;
+        }
+
+        // Filter summary.md from regular file list
+        const displayFiles = files.filter(f => f.path !== 'summary.md');
         html += '<div class="archive-files">';
-        for (const file of files) {
+        for (const file of displayFiles) {
           const isActive = state.viewingArchiveFile === file.path;
           html += `<div class="archive-file-item${isActive ? ' active' : ''}" data-archive-file="${esc(file.path)}" data-archive-ts="${esc(archive.timestamp)}">
             <span class="archive-file-icon">&#128196;</span>
@@ -129,6 +138,17 @@ async function toggleArchiveCard(appName, timestamp) {
     try {
       const files = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/archives/${encodeURIComponent(timestamp)}/files`);
       state.archiveFilesCache[timestamp] = files;
+
+      // Auto-fetch summary.md if present
+      const hasSummary = files.some(f => f.path === 'summary.md');
+      if (hasSummary) {
+        try {
+          const data = await fetchJson(`/api/apps/${encodeURIComponent(appName)}/archives/${encodeURIComponent(timestamp)}/files/summary.md`);
+          state.archiveSummaryCache[timestamp] = data.content || '';
+        } catch {
+          // summary fetch failed — skip display
+        }
+      }
     } catch {
       state.archiveFilesCache[timestamp] = [];
     }

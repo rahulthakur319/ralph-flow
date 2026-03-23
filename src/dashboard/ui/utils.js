@@ -17,9 +17,35 @@ export function renderMarkdown(md) {
   const lines = md.split('\n');
   let inTable = false;
   let tableHtml = '';
+  let inCodeBlock = false;
+  let codeBlockContent = '';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+
+    // Fenced code blocks
+    if (line.startsWith('```')) {
+      if (inCodeBlock) {
+        html += `<pre class="md-code-block"><code>${esc(codeBlockContent)}</code></pre>`;
+        codeBlockContent = '';
+        inCodeBlock = false;
+      } else {
+        if (inTable) {
+          inTable = false;
+          tableHtml += '</tbody></table>';
+          html += tableHtml;
+          tableHtml = '';
+        }
+        inCodeBlock = true;
+        codeBlockContent = '';
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBlockContent += (codeBlockContent ? '\n' : '') + line;
+      continue;
+    }
 
     // Table detection
     if (line.match(/^\|.+\|$/)) {
@@ -66,6 +92,10 @@ export function renderMarkdown(md) {
   if (inTable) {
     tableHtml += '</tbody></table>';
     html += tableHtml;
+  }
+
+  if (inCodeBlock) {
+    html += `<pre class="md-code-block"><code>${esc(codeBlockContent)}</code></pre>`;
   }
 
   return html;

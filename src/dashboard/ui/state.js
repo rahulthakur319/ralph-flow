@@ -35,6 +35,7 @@ export const state = {
   archivesData: [],
   expandedArchive: null,
   archiveFilesCache: {},
+  archiveSummaryCache: {},
   viewingArchiveFile: null,
   projectName: null,
   currentPage: 'app',
