@@ -4,16 +4,64 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnClaude } from '../core/claude.js';
 
-const SUMMARIZE_PROMPT = `You are summarizing an archived workflow run. Read all .md files in the current directory (stories.md, tasks.md, tracker files, and any other artifacts). Understand the stories, task groups, tasks, their relationships, and completion status.
+const SUMMARIZE_PROMPT = `You are summarizing an archived RalphFlow workflow run.
 
-Write a file called summary.md in the current directory containing:
+## What to read
 
-1. A stats header line: stories count, task groups count, tasks completed/total
-2. An ASCII tree diagram showing Story → Task Group → Task flow with ✓ (completed) and ○ (incomplete) markers
-3. A brief narrative per story — what was built and why, in 1-2 sentences
-4. Key decisions or trade-offs noted in the work
+This directory is an archived app snapshot. It contains:
+- Loop subdirectories (e.g. \`00-story-loop/\`, \`01-tasks-loop/\`, \`02-delivery-loop/\`) — each has:
+  - \`stories.md\` or \`tasks.md\` — the work items with \`## STORY-N:\` or \`## TASK-N:\` headers
+  - \`tracker.md\` — completion state with \`- [x]\` (done) and \`- [ ]\` (incomplete) checkboxes, \`completed_tasks\`/\`completed_stories\` lists, and agent activity logs
+- \`ralphflow.yaml\` — pipeline configuration
 
-Keep it concise — the whole summary should fit on one screen. Use clean markdown formatting.
+Read ALL \`.md\` files across all subdirectories. Parse stories, task groups (\`# TASK-GROUP-N:\` headers in tasks.md), and individual tasks. Determine completion from tracker checkboxes: \`[x]\` = completed, \`[ ]\` = incomplete.
+
+## What to write
+
+Write a file called \`summary.md\` in the current directory with this exact structure:
+
+\`\`\`
+# Archive Summary
+
+**N stories · N task groups · N/N tasks completed · N agents**
+
+## Pipeline
+
+\\\`\\\`\\\`
+STORY-1: Title
+├── TASK-GROUP-1: Title
+│   ├── ✓ TASK-1: Title
+│   ├── ✓ TASK-2: Title
+│   └── ○ TASK-3: Title
+└── TASK-GROUP-2: Title
+    └── ✓ TASK-4: Title
+
+STORY-2: Title
+└── TASK-GROUP-3: Title
+    ├── ✓ TASK-5: Title
+    └── ✓ TASK-6: Title
+\\\`\\\`\\\`
+
+## What was built
+
+**STORY-1: Title** — 1-2 sentence narrative of what was accomplished and why.
+
+**STORY-2: Title** — 1-2 sentence narrative.
+
+## Key decisions
+
+- Decision or trade-off noted in tracker logs or task descriptions
+- Another significant decision
+\`\`\`
+
+Rules:
+- Use \`✓\` for completed tasks, \`○\` for incomplete
+- The ASCII tree uses box-drawing characters (\`├── └── │\`)
+- Stats line counts: stories (from stories.md headers), task groups, tasks completed vs total, unique agents (from tracker agent columns)
+- Story narratives should capture *what was built and why* — not just list tasks
+- Key decisions come from tracker logs, task descriptions, or trade-offs visible in the work
+- Keep the whole file under 80 lines — it should fit on one screen
+- If no tasks.md exists (e.g. a research pipeline), adapt: use whatever entity headers exist (topics, stories, etc.)
 
 After writing summary.md, you are done. Do not modify any other files.`;
 
