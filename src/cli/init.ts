@@ -4,7 +4,7 @@ import { initProject } from '../core/init.js';
 
 export const initCommand = new Command('init')
   .description('Initialize a new RalphFlow flow')
-  .option('-t, --template <name>', 'Template to use (code-implementation, research)')
+  .option('-t, --template <name>', 'Template to use (code-implementation, research, tdd-implementation, systematic-debugging, design-review, code-review)')
   .option('-n, --name <name>', 'Custom name for the flow')
   .action(async (opts) => {
     try {

@@ -33,6 +33,87 @@ Discovery → Research → Story → Document
 | Story | synthesize, structure | No | Synthesize findings into narratives |
 | Document | draft, review | No | Produce final documentation |
 
+### tdd-implementation
+
+A three-loop pipeline for test-driven development. Enforces the RED-GREEN-REFACTOR cycle as a structural requirement — not just a suggestion in a prompt. Inspired by [superpowers](https://github.com/obra/superpowers)' TDD and verification skills.
+
+```
+Spec → TDD (Red-Green-Refactor) → Verify
+```
+
+| Loop | Stages | Multi-Agent | Purpose |
+|------|--------|-------------|---------|
+| Spec | analyze, specify, decompose | No | Break requirements into specs with test acceptance criteria |
+| TDD | red, green, refactor | Yes (4 agents) | Write failing test → minimal code → clean up |
+| Verify | verify, report | No | Verify all specs met with fresh evidence |
+
+**Key enforcement patterns:**
+- Iron Law: "NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST"
+- RED stage must confirm the test fails for the *expected* reason
+- GREEN stage: minimal code only — nothing beyond the test
+- Verification requires fresh command output evidence, not claims
+
+### systematic-debugging
+
+A three-loop pipeline for structured bug investigation. Enforces root-cause-first debugging — no fixes are attempted until the root cause is identified and confirmed. Inspired by [superpowers](https://github.com/obra/superpowers)' systematic debugging, root-cause tracing, and defense-in-depth skills.
+
+```
+Investigate → Hypothesize → Fix
+```
+
+| Loop | Stages | Multi-Agent | Purpose |
+|------|--------|-------------|---------|
+| Investigate | reproduce, trace, evidence | No | Reproduce bug, trace data flow, gather evidence |
+| Hypothesize | analyze, hypothesize, test | Yes (3 agents) | Form and test single hypotheses, one variable at a time |
+| Fix | fix, verify, harden | Yes (3 agents) | Fix with test, verify, add defense-in-depth |
+
+**Key enforcement patterns:**
+- "NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST"
+- One hypothesis at a time, smallest possible test change
+- 3+ failed hypotheses triggers escalation to user
+- Defense-in-depth: validation at multiple layers post-fix
+
+### design-review
+
+A four-loop pipeline for design-first development. Adds structured design exploration, spec review, and implementation planning before any code is written. Inspired by [superpowers](https://github.com/obra/superpowers)' brainstorming, writing-plans, and spec-document-reviewer skills.
+
+```
+Explore → Design → Review → Plan
+```
+
+| Loop | Stages | Multi-Agent | Purpose |
+|------|--------|-------------|---------|
+| Explore | context, clarify, scope | No | Explore project state, ask clarifying questions, define scope |
+| Design | alternatives, design, document | No | Propose 2-3 approaches, design incrementally, write spec |
+| Review | spec-review, user-review | Yes (2 agents) | Review spec for completeness + get user approval |
+| Plan | structure, plan, review | No | Write bite-sized implementation plan (2-5 min tasks) |
+
+**Key enforcement patterns:**
+- Always present 2-3 alternatives with trade-offs before committing
+- Spec review checks for TODOs, contradictions, and unrequested features
+- Plan tasks include exact file paths, code snippets, test commands, and commit messages
+
+### code-review
+
+A four-loop pipeline for multi-stage code review. Separates spec compliance from code quality as distinct review stages. Inspired by [superpowers](https://github.com/obra/superpowers)' two-stage review pattern, code-reviewer, and subagent-driven-development skills.
+
+```
+Collect → Spec Review → Quality Review → Fix
+```
+
+| Loop | Stages | Multi-Agent | Purpose |
+|------|--------|-------------|---------|
+| Collect | discover, catalog | No | Identify changesets to review (git log, branches) |
+| Spec Review | review, verdict | Yes (3 agents) | Verify code matches spec — read code, don't trust claims |
+| Quality Review | review, categorize | Yes (3 agents) | Code quality: architecture, testing, security, DRY |
+| Fix | fix, re-review | Yes (3 agents) | Fix Critical/Important issues, self-review |
+
+**Key enforcement patterns:**
+- "CRITICAL: Do Not Trust the Report" — reviewers read actual code
+- Issue categorization: Critical (must fix) / Important (should fix) / Minor (nice to have)
+- Minor issues don't block merge
+- Strengths are acknowledged alongside issues
+
 ## Template Directory Structure
 
 Both built-in and custom templates follow the same directory layout:
@@ -156,7 +237,7 @@ Template names must follow these rules:
 
 - Alphanumeric characters, hyphens (`-`), and underscores (`_`) only
 - 1–50 characters long
-- Cannot match a built-in template name (`code-implementation`, `research`)
+- Cannot match a built-in template name (`code-implementation`, `research`, `tdd-implementation`, `systematic-debugging`, `design-review`, `code-review`)
 - No path traversal characters (`..`, `/`, `\`)
 
 ## Prompt Variable Substitution

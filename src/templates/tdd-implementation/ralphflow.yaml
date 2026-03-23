@@ -1,0 +1,73 @@
+name: tdd-implementation
+description: "Spec → Red-Green-Refactor → Verify pipeline for test-driven development"
+version: 1
+dir: .ralph-flow
+
+entities:
+  SPEC:
+    prefix: SPEC
+    data_file: 00-spec-loop/specs.md
+  TEST-CASE:
+    prefix: TC
+    data_file: 01-tdd-loop/test-cases.md
+  VERIFICATION:
+    prefix: VERIFY
+    data_file: 02-verify-loop/verifications.md
+
+loops:
+  spec-loop:
+    order: 0
+    name: "Spec Loop"
+    prompt: 00-spec-loop/prompt.md
+    tracker: 00-spec-loop/tracker.md
+    data_files:
+      - 00-spec-loop/specs.md
+    entities: [SPEC]
+    stages: [analyze, specify, decompose]
+    completion: "ALL SPECS WRITTEN"
+    feeds: [tdd-loop]
+    multi_agent: false
+    model: claude-sonnet-4-6
+    cadence: 0
+
+  tdd-loop:
+    order: 1
+    name: "TDD Loop"
+    prompt: 01-tdd-loop/prompt.md
+    tracker: 01-tdd-loop/tracker.md
+    data_files:
+      - 01-tdd-loop/test-cases.md
+    entities: [TEST-CASE, SPEC]
+    stages: [red, green, refactor]
+    completion: "ALL TEST-CASES COMPLETE"
+    fed_by: [spec-loop]
+    feeds: [verify-loop]
+    model: claude-sonnet-4-6
+    multi_agent:
+      enabled: true
+      max_agents: 4
+      strategy: tracker-lock
+      agent_placeholder: "{{AGENT_NAME}}"
+    lock:
+      file: 01-tdd-loop/.tracker-lock
+      type: echo
+      stale_seconds: 60
+    worktree:
+      strategy: shared
+      auto_merge: true
+    cadence: 0
+
+  verify-loop:
+    order: 2
+    name: "Verify Loop"
+    prompt: 02-verify-loop/prompt.md
+    tracker: 02-verify-loop/tracker.md
+    data_files:
+      - 02-verify-loop/verifications.md
+    entities: [VERIFICATION, SPEC]
+    stages: [verify, report]
+    completion: "ALL VERIFICATIONS COMPLETE"
+    fed_by: [tdd-loop]
+    multi_agent: false
+    model: claude-sonnet-4-6
+    cadence: 0

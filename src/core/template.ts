@@ -5,7 +5,7 @@ import { stringify as stringifyYaml } from 'yaml';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const BUILT_IN_TEMPLATES = ['code-implementation', 'research'] as const;
+export const BUILT_IN_TEMPLATES = ['code-implementation', 'research', 'tdd-implementation', 'systematic-debugging', 'design-review', 'code-review'] as const;
 
 /**
  * Resolve the path to a template directory.

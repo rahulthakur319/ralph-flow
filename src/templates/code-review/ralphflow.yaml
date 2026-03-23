@@ -1,0 +1,98 @@
+name: code-review
+description: "Collect → Spec Review → Quality Review → Fix pipeline for multi-stage code review"
+version: 1
+dir: .ralph-flow
+
+entities:
+  CHANGESET:
+    prefix: CS
+    data_file: 00-collect-loop/changesets.md
+  ISSUE:
+    prefix: ISSUE
+    data_file: 02-quality-review-loop/issues.md
+
+loops:
+  collect-loop:
+    order: 0
+    name: "Collect Loop"
+    prompt: 00-collect-loop/prompt.md
+    tracker: 00-collect-loop/tracker.md
+    data_files:
+      - 00-collect-loop/changesets.md
+    entities: [CHANGESET]
+    stages: [discover, catalog]
+    completion: "ALL CHANGESETS COLLECTED"
+    feeds: [spec-review-loop]
+    multi_agent: false
+    model: claude-sonnet-4-6
+    cadence: 0
+
+  spec-review-loop:
+    order: 1
+    name: "Spec Review Loop"
+    prompt: 01-spec-review-loop/prompt.md
+    tracker: 01-spec-review-loop/tracker.md
+    entities: [CHANGESET]
+    stages: [review, verdict]
+    completion: "ALL SPEC REVIEWS COMPLETE"
+    fed_by: [collect-loop]
+    feeds: [quality-review-loop]
+    model: claude-sonnet-4-6
+    multi_agent:
+      enabled: true
+      max_agents: 3
+      strategy: tracker-lock
+      agent_placeholder: "{{AGENT_NAME}}"
+    lock:
+      file: 01-spec-review-loop/.tracker-lock
+      type: echo
+      stale_seconds: 60
+    cadence: 0
+
+  quality-review-loop:
+    order: 2
+    name: "Quality Review Loop"
+    prompt: 02-quality-review-loop/prompt.md
+    tracker: 02-quality-review-loop/tracker.md
+    data_files:
+      - 02-quality-review-loop/issues.md
+    entities: [ISSUE, CHANGESET]
+    stages: [review, categorize]
+    completion: "ALL QUALITY REVIEWS COMPLETE"
+    fed_by: [spec-review-loop]
+    feeds: [fix-loop]
+    model: claude-sonnet-4-6
+    multi_agent:
+      enabled: true
+      max_agents: 3
+      strategy: tracker-lock
+      agent_placeholder: "{{AGENT_NAME}}"
+    lock:
+      file: 02-quality-review-loop/.tracker-lock
+      type: echo
+      stale_seconds: 60
+    cadence: 0
+
+  fix-loop:
+    order: 3
+    name: "Fix Loop"
+    prompt: 03-fix-loop/prompt.md
+    tracker: 03-fix-loop/tracker.md
+    entities: [ISSUE, CHANGESET]
+    stages: [fix, re-review]
+    completion: "ALL ISSUES RESOLVED"
+    fed_by: [quality-review-loop]
+    model: claude-sonnet-4-6
+    multi_agent:
+      enabled: true
+      max_agents: 3
+      strategy: tracker-lock
+      agent_placeholder: "{{AGENT_NAME}}"
+    lock:
+      file: 03-fix-loop/.tracker-lock
+      type: echo
+      stale_seconds: 60
+    worktree:
+      strategy: shared
+      auto_merge: true
+    cadence: 0

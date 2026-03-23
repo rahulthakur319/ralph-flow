@@ -1,0 +1,84 @@
+name: design-review
+description: "Explore → Design → Review → Plan pipeline for design-first development"
+version: 1
+dir: .ralph-flow
+
+entities:
+  IDEA:
+    prefix: IDEA
+    data_file: 00-explore-loop/ideas.md
+  DESIGN:
+    prefix: DESIGN
+    data_file: 01-design-loop/designs.md
+  PLAN:
+    prefix: PLAN
+    data_file: 03-plan-loop/plans.md
+
+loops:
+  explore-loop:
+    order: 0
+    name: "Explore Loop"
+    prompt: 00-explore-loop/prompt.md
+    tracker: 00-explore-loop/tracker.md
+    data_files:
+      - 00-explore-loop/ideas.md
+    entities: [IDEA]
+    stages: [context, clarify, scope]
+    completion: "ALL IDEAS SCOPED"
+    feeds: [design-loop]
+    multi_agent: false
+    model: claude-sonnet-4-6
+    cadence: 0
+
+  design-loop:
+    order: 1
+    name: "Design Loop"
+    prompt: 01-design-loop/prompt.md
+    tracker: 01-design-loop/tracker.md
+    data_files:
+      - 01-design-loop/designs.md
+    entities: [DESIGN, IDEA]
+    stages: [alternatives, design, document]
+    completion: "ALL DESIGNS WRITTEN"
+    fed_by: [explore-loop]
+    feeds: [review-loop]
+    multi_agent: false
+    model: claude-sonnet-4-6
+    cadence: 0
+
+  review-loop:
+    order: 2
+    name: "Review Loop"
+    prompt: 02-review-loop/prompt.md
+    tracker: 02-review-loop/tracker.md
+    entities: [DESIGN]
+    stages: [spec-review, user-review]
+    completion: "ALL DESIGNS REVIEWED"
+    fed_by: [design-loop]
+    feeds: [plan-loop]
+    model: claude-sonnet-4-6
+    multi_agent:
+      enabled: true
+      max_agents: 2
+      strategy: tracker-lock
+      agent_placeholder: "{{AGENT_NAME}}"
+    lock:
+      file: 02-review-loop/.tracker-lock
+      type: echo
+      stale_seconds: 60
+    cadence: 0
+
+  plan-loop:
+    order: 3
+    name: "Plan Loop"
+    prompt: 03-plan-loop/prompt.md
+    tracker: 03-plan-loop/tracker.md
+    data_files:
+      - 03-plan-loop/plans.md
+    entities: [PLAN, DESIGN]
+    stages: [structure, plan, review]
+    completion: "ALL PLANS WRITTEN"
+    fed_by: [review-loop]
+    multi_agent: false
+    model: claude-sonnet-4-6
+    cadence: 0

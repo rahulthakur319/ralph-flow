@@ -33,7 +33,7 @@ This starts the web dashboard at `http://localhost:4242` and opens it in your br
 ### From the Dashboard
 
 1. Click **"Create App"** in the sidebar
-2. Select a template (`code-implementation` or `research`)
+2. Select a template (`code-implementation`, `research`, `tdd-implementation`, `systematic-debugging`, `design-review`, or `code-review`)
 3. Enter a name for your flow
 4. Click **Create**
 

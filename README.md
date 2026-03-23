@@ -173,12 +173,25 @@ loops:
 
 ### Built-in
 
-- **`code-implementation`** — Story → Tasks → Delivery pipeline for code projects
-- **`research`** — Discovery → Research → Story → Document pipeline for research projects
+| Template | Pipeline | Purpose |
+|----------|----------|---------|
+| **`code-implementation`** | Story → Tasks → Delivery | Feature development with multi-agent task execution |
+| **`research`** | Discovery → Research → Story → Document | Multi-agent research and synthesis |
+| **`tdd-implementation`** | Spec → TDD → Verify | Test-driven development with RED-GREEN-REFACTOR enforcement |
+| **`systematic-debugging`** | Investigate → Hypothesize → Fix | Root-cause-first debugging with defense-in-depth |
+| **`design-review`** | Explore → Design → Review → Plan | Design-first pipeline with spec review and bite-sized planning |
+| **`code-review`** | Collect → Spec Review → Quality Review → Fix | Multi-stage code review separating spec compliance from quality |
+
+```bash
+npx ralphflow init --template tdd-implementation --name my-tdd-app
+npx ralphflow init --template systematic-debugging --name bug-hunt
+npx ralphflow init --template design-review --name api-redesign
+npx ralphflow init --template code-review --name review-sprint
+```
 
 ### Custom Templates
 
-Create custom templates via the dashboard's Template Creator or the API. Custom templates are stored in `.ralph-flow/.templates/` and appear alongside built-in templates when creating new apps.
+Create custom templates via the dashboard's Template Creator or the API. Clone any built-in template as a starting point, then remix loops, adjust multi-agent settings, and customize prompts. Custom templates are stored in `.ralph-flow/.templates/` and appear alongside built-in templates when creating new apps.
 
 ## Multiple Flows
 
@@ -235,6 +248,10 @@ npm install -g ralphflow
 
 - Node.js >= 18
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
+
+## Acknowledgements
+
+The `tdd-implementation`, `systematic-debugging`, `design-review`, and `code-review` templates draw inspiration from [superpowers](https://github.com/obra/superpowers) by Jesse Vincent — a composable skills framework for AI coding agents. Patterns like the TDD Iron Law, root-cause-first debugging discipline, two-stage review separation, and design-first thinking were adapted into ralph-flow's loop-based orchestration model.
 
 ## License
 
