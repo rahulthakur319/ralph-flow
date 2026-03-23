@@ -10,7 +10,7 @@ export const e2eCommand = new Command('e2e')
   .option('--ui', 'Start web dashboard alongside execution')
   .action(async (opts) => {
     try {
-      let dashboardHandle: { close: () => void } | undefined;
+      let dashboardHandle: { close: () => void; port: number } | undefined;
       if (opts.ui) {
         const { startDashboard } = await import('../dashboard/server.js');
         dashboardHandle = await startDashboard({ cwd: process.cwd() });

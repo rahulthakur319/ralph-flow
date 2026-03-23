@@ -12,7 +12,7 @@ export const runCommand = new Command('run')
   .option('--ui', 'Start web dashboard alongside execution')
   .action(async (loop, opts) => {
     try {
-      let dashboardHandle: { close: () => void } | undefined;
+      let dashboardHandle: { close: () => void; port: number } | undefined;
       if (opts.ui) {
         const { startDashboard } = await import('../dashboard/server.js');
         dashboardHandle = await startDashboard({ cwd: process.cwd() });

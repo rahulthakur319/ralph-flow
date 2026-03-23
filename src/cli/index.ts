@@ -19,9 +19,8 @@ export const program = new Command()
   .addCommand(dashboardCommand)
   .addCommand(createTemplateCommand)
   .action(async () => {
-    const port = 4242;
     const { startDashboard } = await import('../dashboard/server.js');
-    await startDashboard({ cwd: process.cwd(), port });
+    const { port } = await startDashboard({ cwd: process.cwd() });
     const url = `http://localhost:${port}`;
     exec(`open "${url}"`, (err) => {
       if (err) {
