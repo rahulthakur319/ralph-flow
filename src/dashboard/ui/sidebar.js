@@ -79,7 +79,7 @@ export function selectApp(app) {
   state.viewingTemplateName = null;
   state.viewingTemplateConfig = null;
   state.viewingTemplatePrompts = {};
-  document.title = app.appName + ' - RalphFlow Dashboard';
+  document.title = app.appName + ' \u00b7 ' + (state.projectName || 'RalphFlow Dashboard');
   renderSidebar();
   actions.renderContent();
   actions.fetchAppStatus(app.appName);

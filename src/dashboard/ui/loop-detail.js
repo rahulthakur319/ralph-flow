@@ -604,7 +604,7 @@ async function submitDeleteApp(overlay, appName) {
     if (state.selectedApp && state.selectedApp.appName === appName) {
       state.selectedApp = null;
       state.selectedLoop = null;
-      document.title = 'RalphFlow Dashboard';
+      document.title = state.projectName ? state.projectName + ' \u00b7 RalphFlow Dashboard' : 'RalphFlow Dashboard';
     }
     actions.fetchApps();
   } catch (err) {

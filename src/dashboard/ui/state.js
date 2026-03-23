@@ -4,6 +4,7 @@
 export const $ = (sel) => document.querySelector(sel);
 
 export const dom = {
+  pageTitle: $('#pageTitle'),
   hostDisplay: $('#hostDisplay'),
   sidebarApps: $('#sidebarApps'),
   content: $('#content'),
@@ -35,6 +36,7 @@ export const state = {
   expandedArchive: null,
   archiveFilesCache: {},
   viewingArchiveFile: null,
+  projectName: null,
   currentPage: 'app',
   templatesList: [],
   showTemplateBuilder: false,

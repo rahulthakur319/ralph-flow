@@ -56,6 +56,9 @@ fetch('/api/context')
   .then(r => r.json())
   .then(ctx => {
     dom.hostDisplay.textContent = ctx.projectName + ' :' + ctx.port;
+    dom.pageTitle.textContent = ctx.projectName;
+    document.title = ctx.projectName + ' \u00b7 RalphFlow Dashboard';
+    state.projectName = ctx.projectName;
   })
   .catch(() => { /* keep location.host as fallback */ });
 
@@ -183,7 +186,7 @@ document.getElementById('templatesNav').addEventListener('click', () => {
   state.showTemplateWizard = false;
   state.wizardStep = 0;
   state.wizardData = null;
-  document.title = 'Templates - RalphFlow Dashboard';
+  document.title = 'Templates \u00b7 ' + (state.projectName || 'RalphFlow Dashboard');
   renderSidebar();
   renderContent();
 });
