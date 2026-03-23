@@ -183,6 +183,9 @@ The dashboard frontend is split into 9 ES module files loaded via `<script type=
 ### Hook Lifecycle (dashboard/server.ts)
 `startDashboard()` automatically installs the notification hook on startup and removes it on shutdown. SIGINT/SIGTERM signal handlers call `close()` for cleanup on Ctrl+C. A `process.on('exit')` fallback ensures hook removal even if another handler exits first. Hook errors are caught and logged as warnings — never crash the dashboard. This works identically via `dashboard`, `run --ui`, or `e2e --ui`.
 
+### Port Auto-Detection (dashboard/server.ts)
+`startDashboard()` attempts to bind the requested port (default 4242). If EADDRINUSE, it increments the port and retries up to 10 attempts using `createAdaptorServer()` from `@hono/node-server` with manual `server.listen()` for control over error handling. A `tryListen()` helper wraps the listen/error events in a Promise. Once bound, the actual port flows to: hook installation (correct curl URL), console output, `/api/context` endpoint (via mutable `portRef`), and the return value `{ close, port }`. If the port differs from requested, a yellow warning is logged. `createApiRoutes()` receives `portRef: { value: number }` instead of a plain number so the context endpoint always reports the actual bound port.
+
 ### Loop Context Environment Variables
 The runner sets `RALPHFLOW_APP` (flow directory basename, e.g. `code-implementation`) and `RALPHFLOW_LOOP` (config key, e.g. `tasks-loop`) on every spawned Claude session. The hook command includes these as query params (`?app=$RALPHFLOW_APP&loop=$RALPHFLOW_LOOP`) so notifications route to the correct loop in the dashboard. When Claude runs outside ralphflow, the vars are unset and the API defaults to `"unknown"`.
 
